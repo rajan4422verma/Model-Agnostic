@@ -1,4 +1,4 @@
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React from "react";
 import {
@@ -16,76 +16,67 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppColors from "@/constants/colors";
 import { useTaskContext } from "@/context/TaskContext";
 
-interface SettingsRowProps {
+function SettingsRow({
+  icon,
+  label,
+  value,
+  onPress,
+  rightElement,
+  isDark,
+  isLast,
+}: {
+  icon: string;
   label: string;
   value?: string;
   onPress?: () => void;
   rightElement?: React.ReactNode;
   isDark: boolean;
-  showChevron?: boolean;
-}
-
-function SettingsRow({ label, value, onPress, rightElement, isDark, showChevron }: SettingsRowProps) {
+  isLast?: boolean;
+}) {
   const colors = isDark ? AppColors.dark : AppColors.light;
 
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={!onPress}
-      style={[styles.row, { borderBottomColor: colors.separator }]}
+      style={[
+        styles.row,
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+      ]}
       activeOpacity={onPress ? 0.6 : 1}
     >
+      <View style={[styles.rowIcon, { backgroundColor: AppColors.primary + '18' }]}>
+        <Feather name={icon as any} size={15} color={AppColors.primary} />
+      </View>
       <Text style={[styles.rowLabel, { color: colors.label }]}>{label}</Text>
       <View style={styles.rowRight}>
         {value && <Text style={[styles.rowValue, { color: colors.tertiaryLabel }]}>{value}</Text>}
         {rightElement}
-        {showChevron && onPress && (
-          <Feather name="chevron-right" size={18} color={colors.tertiaryLabel} />
+        {onPress && !rightElement && (
+          <Feather name="chevron-right" size={16} color={colors.tertiaryLabel} />
         )}
       </View>
     </TouchableOpacity>
   );
 }
 
-interface SettingsSectionProps {
+function Section({
+  title,
+  children,
+  isDark,
+}: {
   title: string;
   children: React.ReactNode;
   isDark: boolean;
-}
-
-function SettingsSection({ title, children, isDark }: SettingsSectionProps) {
+}) {
   const colors = isDark ? AppColors.dark : AppColors.light;
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.tertiaryLabel }]}>{title.toUpperCase()}</Text>
+      <Text style={[styles.sectionTitle, { color: colors.tertiaryLabel }]}>{title}</Text>
       <View style={[styles.sectionCard, { backgroundColor: colors.cardBackground }]}>
         {children}
       </View>
     </View>
-  );
-}
-
-function ColorButton({
-  color,
-  selected,
-  onPress,
-}: {
-  color: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[
-        styles.colorBtn,
-        { backgroundColor: color },
-        selected && styles.colorBtnSelected,
-      ]}
-      activeOpacity={0.8}
-    >
-      {selected && <Feather name="check" size={12} color="#FFF" />}
-    </TouchableOpacity>
   );
 }
 
@@ -107,104 +98,107 @@ export default function SettingsScreen() {
     setHapticsEnabled,
   } = useTaskContext();
 
-  const themeCycleOrder: Array<"system" | "light" | "dark"> = ["system", "light", "dark"];
+  const themes: Array<"system" | "light" | "dark"> = ["system", "light", "dark"];
   const themeLabels = { system: "System", light: "Light", dark: "Dark" };
 
-  const handleThemeCycle = () => {
-    const current = themeCycleOrder.indexOf(themeMode);
-    const next = themeCycleOrder[(current + 1) % 3];
+  const handleTheme = () => {
+    const next = themes[(themes.indexOf(themeMode) + 1) % 3];
     if (hapticsEnabled) Haptics.selectionAsync();
     setThemeMode(next);
   };
 
-  const handleTimeFormat = () => {
-    if (hapticsEnabled) Haptics.selectionAsync();
-    setTimeFormat(timeFormat === "12h" ? "24h" : "12h");
-  };
-
-  const handleFirstDay = () => {
-    if (hapticsEnabled) Haptics.selectionAsync();
-    setFirstDayOfWeek(firstDayOfWeek === 1 ? 0 : 1);
-  };
-
-  const handleHaptics = (val: boolean) => {
-    if (val) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setHapticsEnabled(val);
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad + 10 }]}>
+        <Text style={[styles.headerSub, { color: colors.tertiaryLabel }]}>Preferences</Text>
         <Text style={[styles.headerTitle, { color: colors.label }]}>Settings</Text>
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Platform.OS === "web" ? 118 : insets.bottom + 100 },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <SettingsSection title="Appearance" isDark={isDark}>
+        <Section title="Appearance" isDark={isDark}>
           <SettingsRow
+            icon="sun"
             label="Theme"
             value={themeLabels[themeMode]}
-            onPress={handleThemeCycle}
+            onPress={handleTheme}
             isDark={isDark}
-            showChevron
           />
           <SettingsRow
+            icon="clock"
             label="Time Format"
             value={timeFormat === "12h" ? "12-hour" : "24-hour"}
-            onPress={handleTimeFormat}
+            onPress={() => {
+              if (hapticsEnabled) Haptics.selectionAsync();
+              setTimeFormat(timeFormat === "12h" ? "24h" : "12h");
+            }}
             isDark={isDark}
-            showChevron
           />
           <SettingsRow
+            icon="calendar"
             label="Week Starts On"
             value={firstDayOfWeek === 1 ? "Monday" : "Sunday"}
-            onPress={handleFirstDay}
+            onPress={() => {
+              if (hapticsEnabled) Haptics.selectionAsync();
+              setFirstDayOfWeek(firstDayOfWeek === 1 ? 0 : 1);
+            }}
             isDark={isDark}
-            showChevron
+            isLast
           />
-        </SettingsSection>
+        </Section>
 
-        <SettingsSection title="Interactions" isDark={isDark}>
+        <Section title="Interactions" isDark={isDark}>
           <SettingsRow
+            icon="activity"
             label="Haptic Feedback"
             isDark={isDark}
+            isLast
             rightElement={
               <Switch
                 value={hapticsEnabled}
-                onValueChange={handleHaptics}
-                trackColor={{ false: colors.separator, true: AppColors.primaryBlue + "80" }}
-                thumbColor={hapticsEnabled ? AppColors.primaryBlue : colors.tertiaryLabel}
+                onValueChange={(val) => {
+                  if (val) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setHapticsEnabled(val);
+                }}
+                trackColor={{
+                  false: colors.separator,
+                  true: AppColors.primary + '99',
+                }}
+                thumbColor={hapticsEnabled ? AppColors.primary : colors.tertiaryLabel}
                 ios_backgroundColor={colors.separator}
               />
             }
           />
-        </SettingsSection>
+        </Section>
 
-        <SettingsSection title="Task Colors" isDark={isDark}>
+        <Section title="Task Colors" isDark={isDark}>
           <View style={styles.colorsGrid}>
             {AppColors.taskColors.map((c) => (
-              <ColorButton
+              <View
                 key={c}
-                color={c}
-                selected={false}
-                onPress={() => {
-                  if (hapticsEnabled) Haptics.selectionAsync();
-                }}
+                style={[styles.colorSwatch, { backgroundColor: c }]}
               />
             ))}
           </View>
-        </SettingsSection>
+        </Section>
 
-        <SettingsSection title="About" isDark={isDark}>
-          <SettingsRow label="Version" value="1.0.0" isDark={isDark} />
-          <SettingsRow label="App" value="Structured Daily Planner" isDark={isDark} />
-        </SettingsSection>
+        <Section title="About" isDark={isDark}>
+          <SettingsRow icon="info" label="Version" value="1.0.0" isDark={isDark} />
+          <SettingsRow
+            icon="heart"
+            label="Structured Daily Planner"
+            value=""
+            isDark={isDark}
+            isLast
+          />
+        </Section>
       </ScrollView>
     </View>
   );
@@ -214,27 +208,33 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 16,
+  },
+  headerSub: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    marginBottom: 2,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontFamily: "Inter_700Bold",
   },
-  scrollView: { flex: 1 },
+  scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 4,
     gap: 24,
   },
   section: { gap: 6 },
   sectionTitle: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
     marginLeft: 4,
   },
   sectionCard: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -246,13 +246,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 13,
+    gap: 12,
     minHeight: 52,
+  },
+  rowIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   rowLabel: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
   },
   rowRight: {
@@ -261,29 +268,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rowValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
   colorsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
     padding: 16,
   },
-  colorBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  colorBtnSelected: {
-    borderWidth: 3,
-    borderColor: "#FFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+  colorSwatch: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
 });

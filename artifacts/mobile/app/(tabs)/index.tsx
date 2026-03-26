@@ -1,4 +1,4 @@
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,11 +16,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppColors from "@/constants/colors";
-import { useTaskContext } from "@/context/TaskContext";
-import { Task } from "@/context/TaskContext";
+import { Task, useTaskContext } from "@/context/TaskContext";
 import {
   addDays,
-  formatDuration,
   formatTime,
   formatTimeRange,
   getDayName,
@@ -30,119 +28,161 @@ import {
   todayStr,
 } from "@/utils/dateUtils";
 
-const HOUR_HEIGHT = 72;
-const TIMELINE_START = 6; // 6am
-const TIMELINE_HOURS = 19; // 6am - midnight (25 hours shown)
-const LEFT_GUTTER = 52;
+const HOUR_HEIGHT = 64;
+const TIMELINE_START = 6;
+const TIMELINE_HOURS = 19;
+const TIME_COL_WIDTH = 48;
 
 function getCurrentTimeOffset(): number {
   const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  return (hour - TIMELINE_START + minute / 60) * HOUR_HEIGHT;
+  return (now.getHours() - TIMELINE_START + now.getMinutes() / 60) * HOUR_HEIGHT;
 }
 
-function getTaskOffset(isoString: string): number {
+function getTaskTop(isoString: string): number {
   const d = new Date(isoString);
-  const hour = d.getHours();
-  const minute = d.getMinutes();
-  return (hour - TIMELINE_START + minute / 60) * HOUR_HEIGHT;
+  return (d.getHours() - TIMELINE_START + d.getMinutes() / 60) * HOUR_HEIGHT;
 }
 
 function getTaskHeight(durationMinutes: number): number {
-  return Math.max((durationMinutes / 60) * HOUR_HEIGHT, 28);
+  return Math.max((durationMinutes / 60) * HOUR_HEIGHT, 36);
 }
 
-// --- Task Block Component ---
-interface TaskBlockProps {
+// --- Completion Ring ---
+function CompletionRing({ completed, color, onPress }: { completed: boolean; color: string; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, tension: 300 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200 }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <TouchableOpacity onPress={handlePress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+      <Animated.View
+        style={[
+          styles.completionRing,
+          {
+            borderColor: completed ? color : '#D8D0CE',
+            backgroundColor: completed ? color : 'transparent',
+            transform: [{ scale }],
+          },
+        ]}
+      >
+        {completed && <Feather name="check" size={12} color="#FFF" />}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// --- Task Row (list-style like Structured app) ---
+interface TaskRowProps {
   task: Task;
   timeFormat: '12h' | '24h';
   onPress: () => void;
+  onToggleComplete: () => void;
   isDark: boolean;
 }
 
-function TaskBlock({ task, timeFormat, onPress, isDark }: TaskBlockProps) {
-  const top = task.startTime ? getTaskOffset(task.startTime) : 0;
+function TaskRow({ task, timeFormat, onPress, onToggleComplete, isDark }: TaskRowProps) {
+  const colors = isDark ? AppColors.dark : AppColors.light;
+  const top = task.startTime ? getTaskTop(task.startTime) : 0;
   const height = getTaskHeight(task.durationMinutes);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, tension: 120 }).start();
+    Animated.spring(scaleAnim, { toValue: 0.985, useNativeDriver: true, tension: 200 }).start();
   };
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 120 }).start();
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 200 }).start();
   };
 
-  const showSubtasks = height > 60 && task.subtasks.length > 0;
-  const completedSubtasks = task.subtasks.filter((s) => s.isCompleted).length;
+  const showTime = height >= 52;
+  const completedSubs = task.subtasks.filter(s => s.isCompleted).length;
+  const hasSubs = task.subtasks.length > 0;
 
   return (
     <Animated.View
       style={[
-        styles.taskBlock,
+        styles.taskRow,
         {
           top,
           height,
-          backgroundColor: task.colorValue + (task.isCompleted ? '33' : 'CC'),
-          borderLeftColor: task.colorValue,
           transform: [{ scale: scaleAnim }],
-          opacity: task.isCompleted ? 0.6 : 1,
         },
       ]}
     >
+      {/* Left: colored strip */}
+      <View style={[styles.taskStrip, { backgroundColor: task.colorValue }]} />
+
+      {/* Icon circle */}
+      <View style={[styles.taskIconCircle, { backgroundColor: task.colorValue + '22' }]}>
+        <View style={[styles.taskIconDot, { backgroundColor: task.colorValue }]} />
+      </View>
+
+      {/* Content */}
       <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={styles.taskBlockInner}
+        style={styles.taskContent}
       >
         <Text
           style={[
-            styles.taskBlockTitle,
+            styles.taskTitle,
             {
-              color: '#FFFFFF',
+              color: task.isCompleted ? colors.tertiaryLabel : colors.label,
               textDecorationLine: task.isCompleted ? 'line-through' : 'none',
             },
           ]}
-          numberOfLines={height > 48 ? 2 : 1}
+          numberOfLines={height > 52 ? 2 : 1}
         >
           {task.title}
         </Text>
-        {height > 44 && task.startTime && (
-          <Text style={[styles.taskBlockTime, { color: 'rgba(255,255,255,0.8)' }]}>
+        {showTime && task.startTime && (
+          <Text style={[styles.taskTime, { color: colors.tertiaryLabel }]}>
             {formatTimeRange(task.startTime, task.durationMinutes, timeFormat)}
           </Text>
         )}
-        {showSubtasks && (
-          <Text style={styles.taskBlockSubtasks}>
-            {completedSubtasks}/{task.subtasks.length}
+        {hasSubs && height > 56 && (
+          <Text style={[styles.taskSubCount, { color: task.colorValue }]}>
+            {completedSubs}/{task.subtasks.length}
           </Text>
         )}
       </Pressable>
+
+      {/* Right: completion ring */}
+      <View style={styles.taskRingWrap}>
+        <CompletionRing
+          completed={task.isCompleted}
+          color={task.colorValue}
+          onPress={onToggleComplete}
+        />
+      </View>
     </Animated.View>
   );
 }
 
-// --- Week Day Picker ---
-interface WeekPickerProps {
+// --- Week Strip ---
+interface WeekStripProps {
   selectedDate: string;
   onSelectDate: (date: string) => void;
   isDark: boolean;
   getTasksForDate: (date: string) => Task[];
 }
 
-function WeekPicker({ selectedDate, onSelectDate, isDark, getTasksForDate }: WeekPickerProps) {
-  const weekDays = getWeekDays(selectedDate, 1);
+function WeekStrip({ selectedDate, onSelectDate, isDark, getTasksForDate }: WeekStripProps) {
   const colors = isDark ? AppColors.dark : AppColors.light;
+  const weekDays = getWeekDays(selectedDate, 1);
 
   return (
-    <View style={[styles.weekPicker, { borderBottomColor: colors.separator }]}>
+    <View style={[styles.weekStrip, { borderBottomColor: colors.separator }]}>
       {weekDays.map((day) => {
         const isSelected = day === selectedDate;
         const isT = isToday(day);
         const dayTasks = getTasksForDate(day);
-        const hasCompleted = dayTasks.length > 0 && dayTasks.every((t) => t.isCompleted);
-        const hasTasks = dayTasks.length > 0;
 
         return (
           <TouchableOpacity
@@ -154,36 +194,35 @@ function WeekPicker({ selectedDate, onSelectDate, isDark, getTasksForDate }: Wee
             <Text
               style={[
                 styles.weekDayLabel,
-                { color: isT ? AppColors.primaryBlue : colors.tertiaryLabel },
+                { color: isSelected ? AppColors.primary : colors.tertiaryLabel },
               ]}
             >
-              {getDayName(day).toUpperCase()}
+              {getDayName(day, true).slice(0, 1).toUpperCase()}
             </Text>
             <View
               style={[
-                styles.weekDayNumber,
-                isSelected && { backgroundColor: AppColors.primaryBlue },
-                isT && !isSelected && { borderWidth: 1.5, borderColor: AppColors.primaryBlue },
+                styles.weekDayCircle,
+                isSelected && { backgroundColor: AppColors.primary },
+                isT && !isSelected && { borderWidth: 1.5, borderColor: AppColors.primary },
               ]}
             >
               <Text
                 style={[
-                  styles.weekDayNumberText,
-                  { color: isSelected ? '#FFF' : isT ? AppColors.primaryBlue : colors.label },
+                  styles.weekDayNum,
+                  { color: isSelected ? '#FFF' : isT ? AppColors.primary : colors.label },
                 ]}
               >
                 {getDayNumber(day)}
               </Text>
             </View>
-            <View style={styles.weekDayDots}>
-              {hasTasks && (
+            {/* Colored task dots */}
+            <View style={styles.taskDots}>
+              {dayTasks.slice(0, 3).map((t, i) => (
                 <View
-                  style={[
-                    styles.weekDayDot,
-                    { backgroundColor: hasCompleted ? colors.tertiaryLabel : AppColors.primaryBlue },
-                  ]}
+                  key={t.id + i}
+                  style={[styles.taskDot, { backgroundColor: t.colorValue }]}
                 />
-              )}
+              ))}
             </View>
           </TouchableOpacity>
         );
@@ -192,15 +231,12 @@ function WeekPicker({ selectedDate, onSelectDate, isDark, getTasksForDate }: Wee
   );
 }
 
-// --- Hour Row ---
-interface HourRowProps {
-  hour: number;
-  isDark: boolean;
-}
-
-function HourRow({ hour, isDark }: HourRowProps) {
+// --- Hour Label + Line ---
+function HourRow({ hour, isDark }: { hour: number; isDark: boolean }) {
   const colors = isDark ? AppColors.dark : AppColors.light;
-  const label = hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  const amPm = hour < 12 ? 'AM' : 'PM';
+  const label = `${h} ${amPm}`;
 
   return (
     <View style={[styles.hourRow, { height: HOUR_HEIGHT }]}>
@@ -211,36 +247,36 @@ function HourRow({ hour, isDark }: HourRowProps) {
 }
 
 // --- Main Screen ---
-export default function TodayScreen() {
+export default function TimelineScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = isDark ? AppColors.dark : AppColors.light;
 
-  const { selectedDate, setSelectedDate, getTasksForDate, hapticsEnabled, timeFormat } = useTaskContext();
+  const { selectedDate, setSelectedDate, getTasksForDate, toggleTaskCompletion, hapticsEnabled, timeFormat } = useTaskContext();
   const scrollRef = useRef<ScrollView>(null);
-  const [currentTimeOffset, setCurrentTimeOffset] = useState(getCurrentTimeOffset);
-  const [showTimeLine, setShowTimeLine] = useState(false);
+  const [currentOffset, setCurrentOffset] = useState(getCurrentTimeOffset);
 
   const dayTasks = useMemo(() => getTasksForDate(selectedDate), [selectedDate, getTasksForDate]);
+  const scheduledTasks = useMemo(
+    () => dayTasks.filter(t => t.startTime).sort((a, b) => (a.startTime! > b.startTime! ? 1 : -1)),
+    [dayTasks]
+  );
+  const completedCount = dayTasks.filter(t => t.isCompleted).length;
+  const showCurrentTime = isToday(selectedDate);
+  const totalHeight = TIMELINE_HOURS * HOUR_HEIGHT;
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  // Current time indicator
   useEffect(() => {
-    const update = () => {
-      setCurrentTimeOffset(getCurrentTimeOffset());
-      setShowTimeLine(isToday(selectedDate));
-    };
-    update();
-    const interval = setInterval(update, 30000);
+    const interval = setInterval(() => setCurrentOffset(getCurrentTimeOffset()), 60000);
     return () => clearInterval(interval);
-  }, [selectedDate]);
+  }, []);
 
-  // Scroll to current time or 8am on mount
   useEffect(() => {
     const timeout = setTimeout(() => {
-      const target = isToday(selectedDate) ? currentTimeOffset - 100 : (8 - TIMELINE_START) * HOUR_HEIGHT;
+      const target = showCurrentTime ? currentOffset - 120 : (8 - TIMELINE_START) * HOUR_HEIGHT;
       scrollRef.current?.scrollTo({ y: Math.max(0, target), animated: true });
-    }, 300);
+    }, 350);
     return () => clearTimeout(timeout);
   }, [selectedDate]);
 
@@ -252,51 +288,64 @@ export default function TodayScreen() {
     [hapticsEnabled]
   );
 
-  const handleAddTask = useCallback(() => {
+  const handleToggle = useCallback(
+    (id: string) => {
+      if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toggleTaskCompletion(id);
+    },
+    [hapticsEnabled, toggleTaskCompletion]
+  );
+
+  const handleAdd = useCallback(() => {
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({ pathname: '/task-create', params: { date: selectedDate } });
   }, [selectedDate, hapticsEnabled]);
 
-  const handlePrevWeek = () => {
-    const newDate = addDays(selectedDate, -7);
-    setSelectedDate(newDate);
-  };
-
-  const handleNextWeek = () => {
-    const newDate = addDays(selectedDate, 7);
-    setSelectedDate(newDate);
-  };
-
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const totalHeight = TIMELINE_HOURS * HOUR_HEIGHT;
-
-  const scheduledTasks = dayTasks.filter((t) => t.startTime);
-  const completedCount = dayTasks.filter((t) => t.isCompleted).length;
+  // Formatted header date
+  const headerDate = (() => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    const dayNum = d.getDate();
+    const monthName = d.toLocaleDateString('en-US', { month: 'long' });
+    const year = d.getFullYear();
+    return { dayNum, monthName, year, dayName: getDayName(selectedDate, false) };
+  })();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={handlePrevWeek} style={styles.navBtn}>
-            <Feather name="chevron-left" size={22} color={colors.secondaryLabel} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleBlock}>
-            <Text style={[styles.headerDate, { color: colors.label }]}>
-              {isToday(selectedDate) ? 'Today' : getDayName(selectedDate, false)}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: topPad + 10,
+            backgroundColor: colors.scaffoldBackground,
+          },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={[styles.headerMonthYear, { color: colors.tertiaryLabel }]}>
+              {headerDate.monthName} {headerDate.year}
             </Text>
-            {dayTasks.length > 0 && (
-              <Text style={[styles.headerSub, { color: colors.tertiaryLabel }]}>
-                {completedCount}/{dayTasks.length} done
+            <View style={styles.headerDateRow}>
+              <Text style={[styles.headerDay, { color: colors.label }]}>
+                {isToday(selectedDate) ? 'Today' : headerDate.dayName}
               </Text>
-            )}
+              {dayTasks.length > 0 && (
+                <View style={[styles.taskCountBadge, { backgroundColor: AppColors.primary }]}>
+                  <Text style={styles.taskCountText}>
+                    {completedCount}/{dayTasks.length}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
-          <TouchableOpacity onPress={handleNextWeek} style={styles.navBtn}>
-            <Feather name="chevron-right" size={22} color={colors.secondaryLabel} />
+          <TouchableOpacity onPress={handleAdd} style={styles.addBtn} activeOpacity={0.85}>
+            <Feather name="plus" size={22} color="#FFF" />
           </TouchableOpacity>
         </View>
 
-        <WeekPicker
+        <WeekStrip
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           isDark={isDark}
@@ -304,222 +353,249 @@ export default function TodayScreen() {
         />
       </View>
 
-      {/* Timeline Scroll */}
+      {/* Timeline */}
       <ScrollView
         ref={scrollRef}
-        style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 118 : 100 }}
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 120 : 100, height: totalHeight + (Platform.OS === 'web' ? 120 : 100) }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.timelineContainer, { height: totalHeight }]}>
+        <View style={{ height: totalHeight, position: 'relative' }}>
           {/* Hour rows */}
           {Array.from({ length: TIMELINE_HOURS }, (_, i) => (
             <HourRow key={i} hour={TIMELINE_START + i} isDark={isDark} />
           ))}
 
           {/* Current time line */}
-          {showTimeLine && (
-            <View
-              style={[
-                styles.currentTimeLine,
-                {
-                  top: currentTimeOffset,
-                  backgroundColor: colors.currentTimeRed,
-                },
-              ]}
-            >
-              <View style={[styles.currentTimeDot, { backgroundColor: colors.currentTimeRed }]} />
+          {showCurrentTime && (
+            <View style={[styles.nowLine, { top: currentOffset, backgroundColor: AppColors.primary }]}>
+              <View style={[styles.nowDot, { backgroundColor: AppColors.primary }]} />
             </View>
           )}
 
-          {/* Task blocks */}
-          <View style={styles.tasksColumn}>
+          {/* Tasks overlay */}
+          <View style={styles.tasksOverlay}>
             {scheduledTasks.map((task) => (
-              <TaskBlock
+              <TaskRow
                 key={task.id}
                 task={task}
                 timeFormat={timeFormat}
                 onPress={() => handleTaskPress(task)}
+                onToggleComplete={() => handleToggle(task.id)}
                 isDark={isDark}
               />
             ))}
           </View>
         </View>
       </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={[
-          styles.fab,
-          {
-            backgroundColor: AppColors.primaryBlue,
-            bottom: Platform.OS === 'web' ? 100 : insets.bottom + 80,
-          },
-        ]}
-        onPress={handleAddTask}
-        activeOpacity={0.85}
-      >
-        <Feather name="plus" size={26} color="#FFF" />
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+
   header: {
+    paddingBottom: 0,
     zIndex: 10,
   },
-  headerTop: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  headerMonthYear: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 2,
+  },
+  headerDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    gap: 8,
   },
-  navBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-  },
-  headerTitleBlock: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerDate: {
-    fontSize: 20,
+  headerDay: {
+    fontSize: 26,
     fontFamily: 'Inter_700Bold',
   },
-  headerSub: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    marginTop: 1,
-  },
-  weekPicker: {
-    flexDirection: 'row',
+  taskCountBadge: {
     paddingHorizontal: 8,
-    paddingBottom: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  taskCountText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#FFF',
+  },
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: AppColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    shadowColor: AppColors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  weekStrip: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   weekDay: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 2,
   },
   weekDayLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
-  weekDayNumber: {
+  weekDayCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekDayNum: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  taskDots: {
+    flexDirection: 'row',
+    gap: 2,
+    height: 6,
+    alignItems: 'center',
+  },
+  taskDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+
+  scroll: { flex: 1 },
+
+  hourRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingTop: 4,
+  },
+  hourLabel: {
+    width: TIME_COL_WIDTH,
+    textAlign: 'right',
+    paddingRight: 10,
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    marginTop: 4,
+  },
+  hourLine: {
+    flex: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 12,
+  },
+
+  nowLine: {
+    position: 'absolute',
+    left: TIME_COL_WIDTH,
+    right: 0,
+    height: 1.5,
+    zIndex: 30,
+  },
+  nowDot: {
+    position: 'absolute',
+    left: -5,
+    top: -4.5,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+
+  tasksOverlay: {
+    position: 'absolute',
+    left: TIME_COL_WIDTH + 4,
+    right: 8,
+    top: 0,
+    bottom: 0,
+  },
+  taskRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  taskStrip: {
+    width: 4,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+  },
+  taskIconCircle: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 10,
+    flexShrink: 0,
   },
-  weekDayNumberText: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
+  taskIconDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
-  weekDayDots: {
-    height: 6,
-    alignItems: 'center',
+  taskContent: {
+    flex: 1,
+    paddingLeft: 8,
+    paddingRight: 4,
     justifyContent: 'center',
   },
-  weekDayDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  timelineContainer: {
-    position: 'relative',
-  },
-  hourRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingTop: 6,
-  },
-  hourLabel: {
-    width: LEFT_GUTTER,
-    textAlign: 'right',
-    paddingRight: 10,
-    fontSize: 11,
-    fontFamily: 'Inter_400Regular',
-  },
-  hourLine: {
-    flex: 1,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 8,
-  },
-  currentTimeLine: {
-    position: 'absolute',
-    left: LEFT_GUTTER,
-    right: 0,
-    height: 1.5,
-    zIndex: 20,
-  },
-  currentTimeDot: {
-    position: 'absolute',
-    left: -5,
-    top: -4,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  tasksColumn: {
-    position: 'absolute',
-    left: LEFT_GUTTER + 4,
-    right: 12,
-    top: 0,
-    bottom: 0,
-  },
-  taskBlock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    overflow: 'hidden',
-  },
-  taskBlockInner: {
-    flex: 1,
-    padding: 8,
-    paddingLeft: 10,
-  },
-  taskBlockTitle: {
-    fontSize: 13,
+  taskTitle: {
+    fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
   },
-  taskBlockTime: {
+  taskTime: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    marginTop: 2,
+    marginTop: 1,
   },
-  taskBlockSubtasks: {
+  taskSubCount: {
     fontSize: 10,
     fontFamily: 'Inter_500Medium',
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 3,
+    marginTop: 2,
   },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  taskRingWrap: {
+    paddingRight: 10,
+    paddingLeft: 6,
+    justifyContent: 'center',
+  },
+  completionRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });

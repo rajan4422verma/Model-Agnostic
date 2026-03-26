@@ -1,9 +1,10 @@
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -20,8 +21,6 @@ import AppColors from "@/constants/colors";
 import { Subtask, Task, useTaskContext } from "@/context/TaskContext";
 import { formatDuration, formatTimeRange } from "@/utils/dateUtils";
 
-const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
-
 function SubtaskRow({
   subtask,
   onToggle,
@@ -34,29 +33,39 @@ function SubtaskRow({
   isDark: boolean;
 }) {
   const colors = isDark ? AppColors.dark : AppColors.light;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handleToggle = () => {
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, tension: 300 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200 }),
+    ]).start();
+    onToggle();
+  };
 
   return (
     <View style={[styles.subtaskRow, { borderBottomColor: colors.separator }]}>
-      <TouchableOpacity onPress={onToggle} style={styles.subtaskCheck} activeOpacity={0.7}>
-        <View
+      <TouchableOpacity onPress={handleToggle} activeOpacity={0.7}>
+        <Animated.View
           style={[
-            styles.checkCircle,
+            styles.checkbox,
             {
-              backgroundColor: subtask.isCompleted ? AppColors.primaryBlue : "transparent",
-              borderColor: subtask.isCompleted ? AppColors.primaryBlue : colors.tertiaryLabel,
+              borderColor: subtask.isCompleted ? AppColors.primary : colors.tertiaryLabel,
+              backgroundColor: subtask.isCompleted ? AppColors.primary : "transparent",
+              transform: [{ scale }],
             },
           ]}
         >
-          {subtask.isCompleted && <Feather name="check" size={12} color="#FFF" />}
-        </View>
+          {subtask.isCompleted && <Feather name="check" size={11} color="#FFF" />}
+        </Animated.View>
       </TouchableOpacity>
       <Text
         style={[
           styles.subtaskText,
           {
-            color: colors.label,
+            color: subtask.isCompleted ? colors.tertiaryLabel : colors.label,
             textDecorationLine: subtask.isCompleted ? "line-through" : "none",
-            opacity: subtask.isCompleted ? 0.5 : 1,
+            flex: 1,
           },
         ]}
       >
@@ -69,34 +78,88 @@ function SubtaskRow({
   );
 }
 
+function MetaRow({
+  icon,
+  label,
+  value,
+  onPress,
+  isDark,
+  isLast,
+}: {
+  icon: string;
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  isDark: boolean;
+  isLast?: boolean;
+}) {
+  const colors = isDark ? AppColors.dark : AppColors.light;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={onPress ? 0.6 : 1}
+      style={[
+        styles.metaRow,
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+      ]}
+    >
+      <Feather name={icon as any} size={17} color={colors.tertiaryLabel} />
+      <Text style={[styles.metaLabel, { color: colors.label }]}>{label}</Text>
+      {value && (
+        <Text style={[styles.metaValue, { color: colors.tertiaryLabel }]}>{value}</Text>
+      )}
+      {onPress && (
+        <Feather name="chevron-right" size={15} color={colors.tertiaryLabel} />
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function TaskDetailScreen() {
   const { taskId, fromInbox } = useLocalSearchParams<{ taskId: string; fromInbox?: string }>();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = isDark ? AppColors.dark : AppColors.light;
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { tasks, inboxTasks, updateTask, deleteTask, deleteFromInbox, toggleTaskCompletion, hapticsEnabled, timeFormat } = useTaskContext();
+  const {
+    tasks,
+    inboxTasks,
+    updateTask,
+    deleteTask,
+    deleteFromInbox,
+    toggleTaskCompletion,
+    hapticsEnabled,
+    timeFormat,
+  } = useTaskContext();
 
   const allTasks = [...tasks, ...inboxTasks];
   const task = allTasks.find((t) => t.id === taskId);
-
   const [newSubtask, setNewSubtask] = useState("");
 
   if (!task) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-        <Text style={[styles.notFound, { color: colors.label }]}>Task not found</Text>
+      <View style={[styles.container, { backgroundColor: colors.scaffoldBackground, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ color: colors.tertiaryLabel, fontFamily: 'Inter_400Regular', fontSize: 16 }}>Task not found</Text>
       </View>
     );
   }
 
-  const handleToggleComplete = useCallback(() => {
+  const isCompleted = task.isCompleted;
+  const completedSubs = task.subtasks.filter((s) => s.isCompleted).length;
+  const recurrenceLabel: Record<string, string> = {
+    none: "Does not repeat",
+    daily: "Every day",
+    weekdays: "Weekdays",
+    weekly: "Every week",
+    custom: "Custom",
+  };
+
+  const handleToggle = useCallback(() => {
     if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     toggleTaskCompletion(task.id);
-    router.back();
   }, [task.id, toggleTaskCompletion, hapticsEnabled]);
 
   const handleDelete = useCallback(() => {
@@ -106,12 +169,9 @@ export default function TaskDetailScreen() {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          if (fromInbox === "true") {
-            deleteFromInbox(task.id);
-          } else {
-            deleteTask(task.id);
-          }
+          if (hapticsEnabled)
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          fromInbox === "true" ? deleteFromInbox(task.id) : deleteTask(task.id);
           router.back();
         },
       },
@@ -126,160 +186,159 @@ export default function TaskDetailScreen() {
       title,
       isCompleted: false,
     };
-    const updated = { ...task, subtasks: [...task.subtasks, newSub] };
-    updateTask(updated);
+    updateTask({ ...task, subtasks: [...task.subtasks, newSub] });
     setNewSubtask("");
   }, [newSubtask, task, updateTask]);
 
-  const handleToggleSubtask = useCallback(
-    (subId: string) => {
+  const handleToggleSub = useCallback(
+    (id: string) => {
       if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const updated: Task = {
+      updateTask({
         ...task,
-        subtasks: task.subtasks.map((s) => (s.id === subId ? { ...s, isCompleted: !s.isCompleted } : s)),
-      };
-      updateTask(updated);
+        subtasks: task.subtasks.map((s) =>
+          s.id === id ? { ...s, isCompleted: !s.isCompleted } : s
+        ),
+      });
     },
     [task, updateTask, hapticsEnabled]
   );
 
-  const handleDeleteSubtask = useCallback(
-    (subId: string) => {
-      const updated: Task = {
-        ...task,
-        subtasks: task.subtasks.filter((s) => s.id !== subId),
-      };
-      updateTask(updated);
+  const handleDeleteSub = useCallback(
+    (id: string) => {
+      updateTask({ ...task, subtasks: task.subtasks.filter((s) => s.id !== id) });
     },
     [task, updateTask]
   );
 
-  const completedSubs = task.subtasks.filter((s) => s.isCompleted).length;
-  const recurrenceLabel = {
-    none: "Does not repeat",
-    daily: "Every day",
-    weekdays: "Weekdays",
-    weekly: "Every week",
-    custom: "Custom",
-  }[task.recurrence];
-
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
       {/* Sheet handle */}
-      <View style={styles.handleContainer}>
-        <View style={[styles.handle, { backgroundColor: colors.separator }]} />
+      <View style={styles.handle}>
+        <View style={[styles.handleBar, { backgroundColor: isCompleted ? colors.tertiaryLabel : task.colorValue }]} />
       </View>
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 4 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-          <Feather name="x" size={22} color={colors.secondaryLabel} />
-        </TouchableOpacity>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleToggleComplete} style={[styles.completeBtn, { borderColor: task.colorValue }]}>
-            <Text style={[styles.completeBtnText, { color: task.colorValue }]}>
-              {task.isCompleted ? "Undo" : "Done"}
-            </Text>
+      {/* Large colored header */}
+      <View style={[styles.heroHeader, { backgroundColor: task.colorValue }]}>
+        {/* Top row: close + delete */}
+        <View style={styles.heroTopRow}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.heroBtn}>
+            <Feather name="x" size={20} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-            <Feather name="trash-2" size={20} color={colors.tertiaryLabel} />
+          <TouchableOpacity onPress={handleDelete} style={styles.heroBtn}>
+            <Feather name="trash-2" size={18} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Icon + Title row */}
+        <View style={styles.heroContent}>
+          <View style={styles.heroIconCircle}>
+            <View style={[styles.heroIconDot, { backgroundColor: task.colorValue }]} />
+          </View>
+          <View style={styles.heroTitleBlock}>
+            {task.startTime && (
+              <Text style={styles.heroTime}>
+                {formatTimeRange(task.startTime, task.durationMinutes, timeFormat)}
+              </Text>
+            )}
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {task.title}
+            </Text>
+            {task.subtasks.length > 0 && (
+              <Text style={styles.heroSubCount}>
+                {completedSubs}/{task.subtasks.length} subtasks
+              </Text>
+            )}
+          </View>
+          {/* Completion ring */}
+          <TouchableOpacity onPress={handleToggle} style={styles.heroRing}>
+            <View
+              style={[
+                styles.heroRingCircle,
+                {
+                  borderColor: "rgba(255,255,255,0.7)",
+                  backgroundColor: isCompleted ? "rgba(255,255,255,0.9)" : "transparent",
+                },
+              ]}
+            >
+              {isCompleted && <Feather name="check" size={18} color={task.colorValue} />}
+            </View>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad + 24 }]}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad + 32 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Color accent */}
-        <View style={[styles.colorBar, { backgroundColor: task.colorValue }]} />
-
-        {/* Title */}
-        <View style={styles.titleSection}>
-          <Text
-            style={[
-              styles.taskTitle,
-              {
-                color: colors.label,
-                textDecorationLine: task.isCompleted ? "line-through" : "none",
-                opacity: task.isCompleted ? 0.5 : 1,
-              },
-            ]}
-          >
-            {task.title}
-          </Text>
-        </View>
-
-        {/* Meta info */}
-        <View style={[styles.metaCard, { backgroundColor: colors.cardBackground }]}>
+        {/* Meta info card */}
+        <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+          <MetaRow
+            icon="calendar"
+            label={new Date(task.date + "T12:00:00").toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+            value={isCompleted ? "Done" : "Today"}
+            isDark={isDark}
+          />
           {task.startTime && (
-            <View style={[styles.metaRow, { borderBottomColor: colors.separator }]}>
-              <Feather name="clock" size={18} color={task.colorValue} />
-              <Text style={[styles.metaText, { color: colors.label }]}>
-                {formatTimeRange(task.startTime, task.durationMinutes, timeFormat)}
-              </Text>
-              <Text style={[styles.metaBadge, { backgroundColor: task.colorValue + "22", color: task.colorValue }]}>
-                {formatDuration(task.durationMinutes)}
-              </Text>
-            </View>
+            <MetaRow
+              icon="clock"
+              label={formatTimeRange(task.startTime, task.durationMinutes, timeFormat)}
+              value={formatDuration(task.durationMinutes)}
+              isDark={isDark}
+            />
           )}
-          {!task.startTime && (
-            <View style={[styles.metaRow, { borderBottomColor: colors.separator }]}>
-              <Feather name="inbox" size={18} color={colors.tertiaryLabel} />
-              <Text style={[styles.metaText, { color: colors.tertiaryLabel }]}>Unscheduled</Text>
-            </View>
-          )}
-          <View style={[styles.metaRow, { borderBottomColor: colors.separator }]}>
-            <Feather name="repeat" size={18} color={colors.tertiaryLabel} />
-            <Text style={[styles.metaText, { color: colors.label }]}>{recurrenceLabel}</Text>
-          </View>
-          <View style={[styles.metaRow, { borderBottomColor: "transparent" }]}>
-            <Feather name="target" size={18} color={colors.tertiaryLabel} />
-            <Text style={[styles.metaText, { color: colors.label }]}>
-              {formatDuration(task.durationMinutes)}
-            </Text>
-          </View>
+          <MetaRow
+            icon="bell"
+            label="Alerts"
+            value={task.notificationMinutesBefore > 0 ? `${task.notificationMinutesBefore} min before` : "None"}
+            isDark={isDark}
+          />
+          <MetaRow
+            icon="repeat"
+            label={recurrenceLabel[task.recurrence] ?? "Does not repeat"}
+            isDark={isDark}
+            isLast
+          />
         </View>
 
         {/* Notes */}
         {task.notes ? (
-          <View style={[styles.notesCard, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>NOTES</Text>
-            <Text style={[styles.notesText, { color: colors.secondaryLabel }]}>{task.notes}</Text>
+          <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+            <View style={styles.cardPadded}>
+              <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>NOTES</Text>
+              <Text style={[styles.notesText, { color: colors.secondaryLabel }]}>
+                {task.notes}
+              </Text>
+            </View>
           </View>
         ) : null}
 
         {/* Subtasks */}
-        <View style={styles.subtasksSection}>
-          <View style={styles.subtasksHeader}>
-            <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>SUBTASKS</Text>
-            {task.subtasks.length > 0 && (
-              <Text style={[styles.subtasksCount, { color: colors.tertiaryLabel }]}>
-                {completedSubs}/{task.subtasks.length}
-              </Text>
-            )}
-          </View>
+        <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+          {task.subtasks.map((sub, idx) => (
+            <SubtaskRow
+              key={sub.id}
+              subtask={sub}
+              onToggle={() => handleToggleSub(sub.id)}
+              onDelete={() => handleDeleteSub(sub.id)}
+              isDark={isDark}
+            />
+          ))}
 
-          {task.subtasks.length > 0 && (
-            <View style={[styles.subtasksList, { backgroundColor: colors.cardBackground }]}>
-              {task.subtasks.map((sub) => (
-                <SubtaskRow
-                  key={sub.id}
-                  subtask={sub}
-                  onToggle={() => handleToggleSubtask(sub.id)}
-                  onDelete={() => handleDeleteSubtask(sub.id)}
-                  isDark={isDark}
-                />
-              ))}
+          {/* Add subtask input */}
+          <View style={[styles.addSubRow, { borderTopColor: task.subtasks.length > 0 ? colors.separator : 'transparent', borderTopWidth: task.subtasks.length > 0 ? StyleSheet.hairlineWidth : 0 }]}>
+            <View style={[styles.addSubIcon, { backgroundColor: colors.separator }]}>
+              <Feather name="plus" size={12} color={colors.tertiaryLabel} />
             </View>
-          )}
-
-          <View style={[styles.addSubtaskRow, { backgroundColor: colors.cardBackground }]}>
             <TextInput
-              style={[styles.addSubtaskInput, { color: colors.label }]}
-              placeholder="Add subtask..."
+              style={[styles.addSubInput, { color: colors.label }]}
+              placeholder="Add Subtask"
               placeholderTextColor={colors.tertiaryLabel}
               value={newSubtask}
               onChangeText={setNewSubtask}
@@ -287,12 +346,23 @@ export default function TaskDetailScreen() {
               returnKeyType="done"
             />
             {newSubtask.length > 0 && (
-              <TouchableOpacity onPress={handleAddSubtask} style={styles.addSubtaskBtn}>
-                <Feather name="plus" size={20} color={AppColors.primaryBlue} />
+              <TouchableOpacity onPress={handleAddSubtask}>
+                <Feather name="arrow-right-circle" size={22} color={AppColors.primary} />
               </TouchableOpacity>
             )}
           </View>
         </View>
+
+        {/* Action button */}
+        <TouchableOpacity
+          onPress={handleToggle}
+          style={[styles.actionBtn, { backgroundColor: task.colorValue }]}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.actionBtnText}>
+            {isCompleted ? "Mark Incomplete" : "Mark as Done"}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -300,189 +370,171 @@ export default function TaskDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  handleContainer: {
-    paddingTop: 8,
-    alignItems: "center",
+  handle: { paddingTop: 10, alignItems: "center" },
+  handleBar: { width: 36, height: 4, borderRadius: 2 },
+
+  heroHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-  },
-  header: {
+  heroTopRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    marginBottom: 16,
   },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  completeBtn: {
-    borderWidth: 1.5,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  completeBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  deleteBtn: {
-    width: 36,
-    height: 36,
+  heroBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.12)",
     alignItems: "center",
     justifyContent: "center",
   },
-  notFound: {
-    flex: 1,
-    textAlign: "center",
-    marginTop: 100,
-    fontSize: 18,
-    fontFamily: "Inter_400Regular",
-  },
-  scrollView: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  colorBar: {
-    height: 4,
-    borderRadius: 2,
-    marginBottom: 4,
-  },
-  titleSection: {
-    paddingVertical: 4,
-  },
-  taskTitle: {
-    fontSize: 26,
-    fontFamily: "Inter_700Bold",
-    lineHeight: 34,
-  },
-  metaCard: {
-    borderRadius: 14,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  metaRow: {
+  heroContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
-  metaText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
+  heroIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
-  metaBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+  heroIconDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.7)",
+  },
+  heroTitleBlock: { flex: 1 },
+  heroTime: {
     fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    overflow: "hidden",
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: 2,
   },
-  notesCard: {
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
+  heroTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: "#FFF",
+    lineHeight: 28,
+  },
+  heroSubCount: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 4,
+  },
+  heroRing: { paddingLeft: 6 },
+  heroRingCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  scroll: { flex: 1 },
+  scrollContent: { padding: 16, gap: 12 },
+
+  card: {
+    borderRadius: 16,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
+  cardPadded: { padding: 16, gap: 6 },
   sectionLabel: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   notesText: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     lineHeight: 22,
   },
-  subtasksSection: { gap: 8 },
-  subtasksHeader: {
+
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+    minHeight: 50,
   },
-  subtasksCount: {
-    fontSize: 12,
+  metaLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+  },
+  metaValue: {
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
   },
-  subtasksList: {
-    borderRadius: 14,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
+
   subtaskRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  subtaskCheck: {
-    flexShrink: 0,
-  },
-  checkCircle: {
+  checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: 6,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },
   subtaskText: {
-    flex: 1,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
   },
-  addSubtaskRow: {
-    borderRadius: 14,
+
+  addSubRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    minHeight: 48,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addSubtaskInput: {
-    flex: 1,
-    fontSize: 15,
     paddingVertical: 12,
+    gap: 10,
   },
-  addSubtaskBtn: {
-    width: 32,
-    height: 32,
+  addSubIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+  },
+  addSubInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    paddingVertical: 2,
+  },
+
+  actionBtn: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  actionBtnText: {
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
+    color: "#FFF",
   },
 });

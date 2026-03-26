@@ -1,58 +1,58 @@
 export const AppColors = {
-  primaryBlue: '#5B8DEF',
-  lavender: '#9B8FE8',
-  green: '#5DA85D',
-  amber: '#F5A623',
-  coral: '#E8734A',
-  pink: '#E84393',
-  teal: '#4EC9B0',
-  purple: '#AF52DE',
-  red: '#FF6B6B',
-  sky: '#64D2FF',
+  // Primary coral
+  primary: '#F07B6B',
+  primaryLight: '#F9AFA7',
+  primaryDark: '#D4574A',
+  primaryBg: '#FEF2F0',
 
+  // Task accent colors (same style as Structured app)
   taskColors: [
-    '#5B8DEF',
-    '#9B8FE8',
-    '#5DA85D',
-    '#F5A623',
-    '#E8734A',
-    '#E84393',
-    '#4EC9B0',
-    '#AF52DE',
-    '#FF6B6B',
-    '#64D2FF',
+    '#F07B6B', // coral
+    '#5DB8D4', // teal blue
+    '#7C9FE5', // blue
+    '#E67E8A', // pink red
+    '#70C17A', // green
+    '#F0A85B', // orange
+    '#A07EE0', // purple
+    '#5DC4A8', // mint
+    '#E07BB5', // rose
+    '#5A9ED6', // sky blue
   ],
 
   light: {
-    scaffoldBackground: '#F2F2F7',
+    scaffoldBackground: '#F8F0EE',
     cardBackground: '#FFFFFF',
-    label: '#1C1C1E',
-    secondaryLabel: '#3C3C43',
-    tertiaryLabel: '#8E8E93',
-    separator: '#E5E5EA',
-    primaryBlue: '#5B8DEF',
-    currentTimeRed: '#FF3B30',
-    tabIconDefault: '#8E8E93',
-    tabIconSelected: '#5B8DEF',
-    tint: '#5B8DEF',
+    label: '#1A1A1A',
+    secondaryLabel: '#4A4A4A',
+    tertiaryLabel: '#9A9A9A',
+    separator: '#EDE8E7',
+    separatorStrong: '#D8D0CE',
+    primary: '#F07B6B',
+    primaryFaded: '#FEF0EE',
+    currentTimeRed: '#F07B6B',
+    tabIconDefault: '#B0A8A6',
+    tabIconSelected: '#F07B6B',
+    tint: '#F07B6B',
+    completionRing: '#E0D8D6',
   },
 
   dark: {
-    scaffoldBackground: '#000000',
-    cardBackground: '#1C1C1E',
-    label: '#FFFFFF',
-    secondaryLabel: '#EBEBF5',
-    tertiaryLabel: '#636366',
-    separator: '#38383A',
-    primaryBlue: '#5B8DEF',
-    currentTimeRed: '#FF453A',
-    tabIconDefault: '#636366',
-    tabIconSelected: '#5B8DEF',
-    tint: '#5B8DEF',
+    scaffoldBackground: '#1A1212',
+    cardBackground: '#2A1F1E',
+    label: '#F5F0EF',
+    secondaryLabel: '#C8BFBD',
+    tertiaryLabel: '#7A706E',
+    separator: '#3A2F2E',
+    separatorStrong: '#4A3F3E',
+    primary: '#F07B6B',
+    primaryFaded: '#3A2520',
+    currentTimeRed: '#F07B6B',
+    tabIconDefault: '#7A706E',
+    tabIconSelected: '#F07B6B',
+    tint: '#F07B6B',
+    completionRing: '#4A3F3E',
   },
 };
 
 export default AppColors;
-
-// Legacy compatibility
 export const Colors = AppColors;
