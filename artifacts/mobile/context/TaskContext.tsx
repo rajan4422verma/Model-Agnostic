@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  cancelTaskNotification,
+  rescheduleAllNotifications,
+  scheduleTaskNotification,
+} from '@/utils/notifications';
 
 export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'weekdays' | 'custom';
 
@@ -291,7 +296,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (tasksRaw) {
-        setTasks(JSON.parse(tasksRaw));
+        const parsed: Task[] = JSON.parse(tasksRaw);
+        setTasks(parsed);
+        // Re-schedule notifications for all upcoming tasks on app boot
+        rescheduleAllNotifications(parsed).catch(() => {});
       } else {
         // Seed sample data
         const seeded: Task[] = SAMPLE_TASKS.map((t) => ({
@@ -354,6 +362,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       };
       await saveTasks([...tasks, newTask]);
+      // Schedule alarm at start time
+      if (newTask.startTime && !newTask.isCompleted) {
+        scheduleTaskNotification(newTask.id, newTask.title, newTask.startTime, newTask.durationMinutes).catch(() => {});
+      }
     },
     [tasks, saveTasks]
   );
@@ -361,6 +373,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const updateTask = useCallback(
     async (task: Task) => {
       await saveTasks(tasks.map((t) => (t.id === task.id ? task : t)));
+      // Re-schedule (cancel old, set new) whenever a task is updated
+      if (task.startTime && !task.isCompleted) {
+        scheduleTaskNotification(task.id, task.title, task.startTime, task.durationMinutes).catch(() => {});
+      } else {
+        cancelTaskNotification(task.id).catch(() => {});
+      }
     },
     [tasks, saveTasks]
   );
@@ -368,22 +386,39 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const deleteTask = useCallback(
     async (id: string) => {
       await saveTasks(tasks.filter((t) => t.id !== id));
+      cancelTaskNotification(id).catch(() => {});
     },
     [tasks, saveTasks]
   );
 
   const toggleTaskCompletion = useCallback(
     async (id: string) => {
-      await saveTasks(tasks.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t)));
+      const updated = tasks.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t));
+      await saveTasks(updated);
+      const task = updated.find((t) => t.id === id);
+      if (task) {
+        if (task.isCompleted) {
+          // Completed — cancel its alarm
+          cancelTaskNotification(id).catch(() => {});
+        } else if (task.startTime) {
+          // Uncompleted — reinstate the alarm
+          scheduleTaskNotification(id, task.title, task.startTime, task.durationMinutes).catch(() => {});
+        }
+      }
     },
     [tasks, saveTasks]
   );
 
   const rescheduleTask = useCallback(
     async (id: string, newStartTime: string, newDate: string) => {
-      await saveTasks(
-        tasks.map((t) => (t.id === id ? { ...t, startTime: newStartTime, date: newDate } : t))
+      const updated = tasks.map((t) =>
+        t.id === id ? { ...t, startTime: newStartTime, date: newDate } : t
       );
+      await saveTasks(updated);
+      const task = updated.find((t) => t.id === id);
+      if (task && !task.isCompleted) {
+        scheduleTaskNotification(id, task.title, newStartTime, task.durationMinutes).catch(() => {});
+      }
     },
     [tasks, saveTasks]
   );
@@ -437,6 +472,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         saveTasks([...tasks, scheduled]),
         saveInbox(inboxTasks.filter((t) => t.id !== id)),
       ]);
+      // Schedule alarm for the newly scheduled task
+      scheduleTaskNotification(id, task.title, startTime, task.durationMinutes).catch(() => {});
     },
     [inboxTasks, tasks, saveTasks, saveInbox]
   );
