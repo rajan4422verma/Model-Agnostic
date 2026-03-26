@@ -91,6 +91,18 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/mobile` (`@workspace/mobile`)
+
+Expo React Native app — Structured Daily Planner.
+
+- Framework: Expo SDK 54, Expo Router (file-based routing)
+- State: React Context + AsyncStorage (no backend DB)
+- Design: iOS-inspired, Inter font, AppColors palette in `constants/colors.ts`
+- Tabs: NativeTabs with liquid glass (iOS 26+) / ClassicTabs fallback
+- Key screens: `app/(tabs)/index.tsx` (timeline), `app/(tabs)/inbox.tsx`, `app/(tabs)/settings.tsx`, `app/task-detail.tsx`, `app/task-create.tsx`
+- Context: `context/TaskContext.tsx` — tasks, inbox, settings, CRUD ops
+- Utils: `utils/dateUtils.ts` — time/date formatting, week calculation
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.

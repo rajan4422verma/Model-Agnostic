@@ -1,0 +1,432 @@
+Here's a comprehensive, model-agnostic prompt you can paste into any AI (GPT-4, Gemini, Mistral, etc.):
+
+---
+
+# 🗓️ STRUCTURED DAILY PLANNER APP — COMPLETE FLUTTER BUILD PROMPT
+
+---
+
+## ROLE & CONTEXT
+
+You are a **Senior Flutter Developer and UI/UX Expert** with deep expertise in:
+- Flutter 3.x (latest stable) and Dart 3.x
+- Clean Architecture (MVVM / Feature-based)
+- iOS-style design systems (Apple HIG)
+- Animation-heavy, production-grade mobile UIs
+
+Build a **complete, production-ready Android/iOS Flutter app** that replicates the core experience of the **"Structured – Daily Planner"** app. This is a visual daily planner combining a timeline, to-do list, and calendar in one minimal, beautiful interface.
+
+---
+
+## TECH STACK (MANDATORY)
+
+| Layer | Package |
+|---|---|
+| State Management | `flutter_riverpod ^2.4.9` + `riverpod_annotation` |
+| Local Database | `hive ^2.2.3` + `hive_flutter` |
+| Notifications | `flutter_local_notifications ^16.x` + `timezone` |
+| Animations | `flutter_animate ^4.3.0` |
+| Typography | `google_fonts ^6.x` (use **Nunito** — closest to SF Pro) |
+| Unique IDs | `uuid ^4.x` |
+| Date formatting | `intl ^0.19` |
+| Routing | Flutter Navigator 2.0 (no extra package needed) |
+| UI Framework | **Material 3** (`useMaterial3: true`) |
+
+---
+
+## FOLDER STRUCTURE (STRICT)
+
+```
+lib/
+├── core/
+│   ├── theme/
+│   │   └── app_theme.dart         ← Design tokens, light/dark ThemeData, AppColors extension
+│   ├── utils/
+│   └── constants/
+├── models/
+│   ├── task_model.dart            ← @HiveType Task, Subtask, RecurrenceType
+│   └── task_model.g.dart          ← Hive generated adapters (write manually or run build_runner)
+├── services/
+│   ├── task_repository.dart       ← All Hive CRUD, recurring logic, inbox↔timeline migration
+│   ├── notification_service.dart  ← flutter_local_notifications setup + schedule/cancel
+│   └── providers.dart             ← All Riverpod providers (StateNotifier, StreamProvider, etc.)
+├── features/
+│   ├── timeline/
+│   │   └── timeline_screen.dart   ← ⭐ MAIN SCREEN — 24h vertical timeline
+│   ├── tasks/
+│   │   ├── task_detail_screen.dart
+│   │   └── task_create_screen.dart
+│   ├── inbox/
+│   │   └── inbox_screen.dart
+│   ├── settings/
+│   │   └── settings_screen.dart
+│   └── notifications/ (optional)
+├── widgets/
+│   ├── timeline/
+│   │   ├── timeline_painter.dart  ← CustomPainter for hour grid + current time line
+│   │   └── task_card.dart         ← Rounded task block widget
+│   └── common/
+│       ├── app_bottom_sheet.dart
+│       ├── color_picker_sheet.dart
+│       ├── icon_picker_sheet.dart
+│       └── duration_picker.dart
+└── main.dart                      ← Hive init, adapter registration, ProviderScope, MaterialApp
+```
+
+---
+
+## DATA MODEL (IMPLEMENT EXACTLY)
+
+```dart
+@HiveType(typeId: 0)
+class Task extends HiveObject {
+  String id;              // UUID
+  String title;
+  String? notes;
+  DateTime? startTime;    // null = inbox task
+  int durationMinutes;    // default 30
+  int colorValue;         // ARGB int, e.g. 0xFF5B8DEF
+  int iconCodePoint;      // MaterialIcons codepoint
+  String iconFontFamily;  // 'MaterialIcons'
+  bool isCompleted;
+  List<Subtask> subtasks;
+  RecurrenceType recurrence;
+  List<int> recurrenceDays; // 1=Mon..7=Sun for weekly
+  int notificationMinutesBefore; // -1 = none
+  DateTime createdAt;
+  DateTime date;          // which calendar date this belongs to
+}
+
+@HiveType(typeId: 1)
+class Subtask { String id; String title; bool isCompleted; }
+
+@HiveType(typeId: 2)
+enum RecurrenceType { none, daily, weekly, weekdays, custom }
+```
+
+---
+
+## FEATURE SPECIFICATIONS
+
+### 1. TIMELINE SCREEN ⭐ (HIGHEST PRIORITY)
+
+**Layout:**
+- Full-screen `CustomScrollView` with `SliverPersistentHeader` (sticky date header)
+- `CustomPaint` draws the 24-hour grid:
+  - Hour labels (`6`, `7`... `12 AM/PM`) left-aligned at 46px width
+  - Thin horizontal lines every hour (0.5px)
+  - Dashed/faint lines every 30 minutes (0.3px)
+  - **Current time red line** with a dot indicator (only on today)
+- `hourHeight = 64.0` pixels per hour (configurable)
+- Tasks rendered as `Positioned` widgets within a `Stack`
+
+**Task Cards:**
+- Positioned by `top: (hour + min/60) * hourHeight`
+- Height = `(durationMinutes / 60) * hourHeight`, minimum 28px
+- Left border: 3px solid task color
+- Background: task color at 15% opacity
+- Rounded corners: `BorderRadius.circular(10)`
+- Show: icon, title, time range, subtask progress bar (if subtasks exist)
+- Adaptive content: tiny/compact/full layouts based on card height
+
+**Overlap Handling:**
+- Detect overlapping tasks by time range
+- Assign column indices, split available width equally
+
+**Drag & Drop Rescheduling:**
+- `LongPress` to initiate drag
+- Show ghost card at new position while dragging
+- Snap to 15-minute increments
+- On release: call `repository.rescheduleTask(id, newStartTime)`
+- Haptic feedback: `HapticFeedback.mediumImpact()` on grab, `lightImpact()` on drop
+
+**Sticky Header:**
+- Collapses from 160px → 110px on scroll
+- Shows: Day name (large), full date, "Today" button, "+" FAB
+- 7-day week strip: Mon–Sun, selected day highlighted with primary blue pill
+- Dot indicator under today's date
+
+**Auto-scroll:** On init, scroll so current time is visible (upper third of viewport)
+
+---
+
+### 2. TASK MODEL & REPOSITORY
+
+```dart
+class TaskRepository {
+  // Hive box operations
+  Future<void> init();              // open boxes, seed sample data if empty
+  List<Task> getTasksForDate(DateTime date);  // includes recurring
+  Future<void> addTask(Task task);
+  Future<void> updateTask(Task task);
+  Future<void> deleteTask(String id);
+  Future<void> toggleTaskCompletion(String id);
+  Future<void> rescheduleTask(String id, DateTime newStart);
+
+  // Recurring logic
+  List<Task> _generateRecurringTasksForDate(DateTime date);
+  // Clone tasks with adjusted startTime for daily/weekday/weekly patterns
+
+  // Inbox
+  List<Task> getInboxTasks();
+  Future<void> addToInbox(Task task);
+  Future<void> scheduleFromInbox(String id, DateTime startTime);
+  Future<void> deleteFromInbox(String id);
+
+  // Reactive
+  Stream<BoxEvent> watchTasks();
+  Stream<BoxEvent> watchInbox();
+}
+```
+
+---
+
+### 3. STATE MANAGEMENT (RIVERPOD)
+
+```dart
+// Core providers
+final taskRepositoryProvider = Provider<TaskRepository>(...);
+final selectedDateProvider = StateProvider<DateTime>(...);  // defaults to today
+
+// Timeline tasks — reacts to date changes + repository changes
+final timelineTasksProvider = StateNotifierProvider<TimelineTasksNotifier, AsyncValue<List<Task>>>(...);
+
+// Inbox
+final inboxTasksProvider = StateNotifierProvider<InboxNotifier, List<Task>>(...);
+
+// Current time — ticks every 30s for the red time indicator
+final currentTimeProvider = StreamProvider<DateTime>(...);
+
+// Theme
+final themeModeProvider = StateProvider<AppThemeMode>(...);
+
+// Task form (autoDispose)
+final taskFormProvider = StateNotifierProvider.autoDispose<TaskFormNotifier, TaskFormState>(...);
+```
+
+---
+
+### 4. TASK CREATE / EDIT SCREEN
+
+Fields to implement:
+- **Title** (text field) + **Color & Icon** (tap the icon button to open picker)
+- **Notes** (multiline text field)
+- **Start Time** (tap → `showTimePicker`, display as "9:30 AM")
+- **Duration** (tap → bottom sheet with presets: 15m, 30m, 45m, 1h, 1.5h, 2h + custom spinner)
+- **Subtasks** (add/remove/toggle inline list)
+- **Repeat** (bottom sheet: Never / Daily / Weekdays / Weekly)
+- **Reminder** (bottom sheet: None / 5m / 10m / 15m / 30m / 1h before)
+- Delete button (red, only in edit mode) with confirmation dialog
+
+---
+
+### 5. INBOX SCREEN
+
+- Header: "Inbox" title + task count + "+" button
+- `Dismissible` list cards (swipe left to delete)
+- Each card: colored left border, icon, title, notes preview
+- "Schedule" chip button → `showDatePicker` → `showTimePicker` → `scheduleFromInbox()`
+- Empty state: centered icon + message
+
+---
+
+### 6. SETTINGS SCREEN
+
+Sections:
+- **Appearance:** Light / Dark / System segmented control
+- **Calendar:** First day of week, timeline start hour, time format (12h/24h)
+- **Notifications:** Toggle reminders, toggle haptic feedback
+- **About:** Version, Rate App, Privacy Policy
+
+---
+
+### 7. BOTTOM NAVIGATION
+
+```dart
+NavigationBar(  // Material 3
+  destinations: [
+    NavigationDestination(icon: Icon(Icons.view_day_outlined), selectedIcon: Icon(Icons.view_day), label: 'Timeline'),
+    NavigationDestination(icon: Icon(Icons.inbox_outlined), selectedIcon: Icon(Icons.inbox), label: 'Inbox'),
+    NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+  ]
+)
+```
+
+---
+
+### 8. THEME SYSTEM (iOS-INSPIRED MATERIAL 3)
+
+**Light Mode colors (match iOS system colors):**
+```
+scaffoldBackground: #F2F2F7
+cardBackground:     #FFFFFF
+label:              #1C1C1E
+secondaryLabel:     #3C3C43
+tertiaryLabel:      #8E8E93
+separator:          #E5E5EA
+primaryBlue:        #5B8DEF
+currentTimeRed:     #FF3B30
+```
+
+**Dark Mode:**
+```
+scaffoldBackground: #000000
+cardBackground:     #1C1C1E
+label:              #FFFFFF
+tertiaryLabel:      #636366
+separator:          #38383A
+primaryBlue:        #5B8DEF
+currentTimeRed:     #FF453A
+```
+
+**Task accent palette (10 colors):**
+Blue `#5B8DEF`, Lavender `#9B8FE8`, Green `#5DA85D`, Amber `#F5A623`, Coral `#E8734A`, Pink `#E84393`, Teal `#4EC9B0`, Purple `#AF52DE`, Red `#FF6B6B`, Sky `#64D2FF`
+
+**Typography:** Use `google_fonts: Nunito` — closest free alternative to SF Pro. Apply letter-spacing `-0.3` to headings.
+
+**AppColors ThemeExtension** — create a custom `ThemeExtension<AppColors>` so any widget can access `context.colors.cardBackground` etc.
+
+---
+
+### 9. ANIMATIONS
+
+Apply `flutter_animate` on all screens:
+
+```dart
+// Cards enter with staggered fade + slide
+widget
+  .animate()
+  .fadeIn(duration: 300.ms, delay: (50 * index).ms)
+  .slideX(begin: 0.05, curve: Curves.easeOutCubic)
+
+// Completion toggle
+AnimatedContainer(duration: Duration(milliseconds: 250), ...)
+AnimatedSwitcher(duration: Duration(milliseconds: 200), ...)
+
+// Drag ghost
+.scaleXY(end: 1.02, curve: Curves.easeOut)
+```
+
+---
+
+### 10. SAMPLE DATA (SEED ON FIRST LAUNCH)
+
+Generate these 10 tasks for today when Hive boxes are empty:
+
+| Title | Time | Duration | Color | Recurrence |
+|---|---|---|---|---|
+| Morning Meditation | 7:00 | 20m | Lavender | Daily |
+| Morning Run | 7:30 | 45m | Green | — |
+| Breakfast & Coffee | 8:30 | 30m | Amber | — |
+| Deep Work: Project Alpha | 9:30 | 90m | Blue | — |
+| Team Standup | 11:30 | 30m | Coral | Weekdays |
+| Lunch Break | 13:00 | 60m | Amber | — |
+| Design Review | 14:30 | 60m | Pink | — |
+| Gym Session | 17:30 | 75m | Green | — |
+| Read: Atomic Habits | 21:00 | 45m | Lavender | Daily |
+| Evening Journaling | 22:00 | 20m | Blue | Daily |
+
+Include 5 inbox tasks: "Call dentist", "Buy groceries", "Review pull requests", "Plan weekend trip", "Update resume"
+
+---
+
+## MAIN.DART REQUIREMENTS
+
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Hive setup
+  await Hive.initFlutter();
+  Hive.registerAdapter(TaskAdapter());
+  Hive.registerAdapter(SubtaskAdapter());
+  Hive.registerAdapter(RecurrenceTypeAdapter());
+
+  // Notification setup
+  await NotificationService().init();
+
+  // Repository init
+  final repo = TaskRepository();
+  await repo.init();
+
+  runApp(
+    ProviderScope(
+      overrides: [taskRepositoryProvider.overrideWithValue(repo)],
+      child: const StructuredApp(),
+    ),
+  );
+}
+
+class StructuredApp extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    return MaterialApp(
+      title: 'Structured',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: switch (themeMode) {
+        AppThemeMode.light => ThemeMode.light,
+        AppThemeMode.dark => ThemeMode.dark,
+        AppThemeMode.system => ThemeMode.system,
+      },
+      home: const MainShell(),
+    );
+  }
+}
+```
+
+---
+
+## DESIGN RULES (NEVER VIOLATE)
+
+1. **No elevation shadows** on cards (use `elevation: 0`)
+2. **Rounded corners everywhere** — cards: 16px, buttons: 10-14px, icons: 8-12px
+3. **Soft color fills** — use task color at 12-15% opacity for backgrounds
+4. **Typography hierarchy** — title 17/600, body 15/400, label 12/600, caption 11/500
+5. **Haptic feedback** on every meaningful interaction
+6. **Bouncing scroll physics** everywhere (`BouncingScrollPhysics`)
+7. **No AppBar borders** (`scrolledUnderElevation: 0`)
+8. **Consistent spacing** — 8/12/16/20/24 grid
+9. **Empty states** — every list must have a centered illustration + message
+10. **Smooth page transitions** — slide from bottom (sheet-style) for task creation
+
+---
+
+## DELIVERABLE CHECKLIST
+
+Generate ALL of these files in order:
+
+- [ ] `pubspec.yaml`
+- [ ] `lib/models/task_model.dart`
+- [ ] `lib/models/task_model.g.dart` (manual Hive adapter)
+- [ ] `lib/core/theme/app_theme.dart`
+- [ ] `lib/services/task_repository.dart`
+- [ ] `lib/services/notification_service.dart`
+- [ ] `lib/services/providers.dart`
+- [ ] `lib/widgets/timeline/timeline_painter.dart`
+- [ ] `lib/widgets/timeline/task_card.dart`
+- [ ] `lib/widgets/common/app_bottom_sheet.dart`
+- [ ] `lib/widgets/common/color_picker_sheet.dart`
+- [ ] `lib/widgets/common/duration_picker.dart`
+- [ ] `lib/features/timeline/timeline_screen.dart` ⭐
+- [ ] `lib/features/tasks/task_detail_screen.dart`
+- [ ] `lib/features/tasks/task_create_screen.dart`
+- [ ] `lib/features/inbox/inbox_screen.dart`
+- [ ] `lib/features/settings/settings_screen.dart`
+- [ ] `lib/main.dart`
+
+---
+
+## GENERATION INSTRUCTIONS
+
+1. Generate **one file at a time**, fully complete — no placeholder comments like `// TODO`
+2. Every file must **compile without errors** independently
+3. Add **inline comments** on all non-trivial logic (timeline math, column overlap, recurring generation)
+4. Start with `pubspec.yaml`, then models, then services, then widgets, then screens, then `main.dart`
+5. **Do not truncate** any file — output the complete content
+6. After all files, provide a **setup guide**: `flutter pub get` → `flutter pub run build_runner build` → `flutter run`
+
+---
+
+*Copy this entire prompt. It is self-contained and produces a complete, runnable Flutter project in any capable AI model.*
