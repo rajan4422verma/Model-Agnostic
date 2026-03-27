@@ -1,4 +1,4 @@
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useRef } from "react";
@@ -342,21 +342,8 @@ export default function ScheduleScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-      {/* Dark header */}
-      <View style={[styles.darkHeader, { paddingTop: topPad }]}>
-        <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>
-          <Feather name="menu" size={22} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>The Mindful Canvas</Text>
-        <TouchableOpacity activeOpacity={0.7}>
-          <View style={styles.avatar}>
-            <Feather name="user" size={18} color="#FFF" />
-          </View>
-        </TouchableOpacity>
-      </View>
-
       {/* Month/Year + count */}
-      <View style={[styles.monthSection, { backgroundColor: colors.scaffoldBackground }]}>
+      <View style={[styles.monthSection, { backgroundColor: colors.scaffoldBackground, paddingTop: topPad + 8 }]}>
         <Text style={[styles.monthTitle, { color: colors.label }]}>{monthYear}</Text>
         <Text style={[styles.taskCount, { color: colors.tertiaryLabel }]}>{taskCountLabel}</Text>
       </View>
@@ -417,25 +404,6 @@ export default function ScheduleScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  darkHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    backgroundColor: "#1C1B1F",
-  },
-  headerIconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: {
-    flex: 1, textAlign: "center",
-    fontSize: 17, fontFamily: "Inter_600SemiBold", color: "#FFFFFF",
-  },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.3)",
-  },
 
   monthSection: {
     paddingHorizontal: 20,
