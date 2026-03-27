@@ -1,0 +1,58 @@
+Update the task UI with the following changes ONLY. Do not modify layout, colors, spacing, typography, or any other elements.
+
+IMPORTANT:
+Apply these changes ONLY on the "Schedule" screen/tab. Do NOT apply any changes to other tabs such as AI Assist, Tasks, Calendar, or Settings.
+
+1. Remove the "TASK" label shown on each task card.
+
+2. Replace the "TASK" label with:
+
+   * Task start time and end time (e.g., 7:00 AM - 7:20 AM).
+   * This time should appear in the same position where the "TASK" label currently exists.
+
+3. Add a small relevant icon (logo) before each task title:
+
+   * Morning Meditation → meditation/lotus icon
+   * Morning Run → running icon
+   * Breakfast & Coffee → breakfast/coffee icon
+   * Deep Work → work/laptop icon
+
+4. Ensure the icon:
+
+   * Appears to the left of the task title
+   * Matches the style of the UI (minimal, clean, consistent size)
+   * Does not change spacing or alignment significantly
+
+5. Timeline Line Adjustment:
+
+   * The vertical timeline line (next to time labels like 7:00 AM, 7:30 AM, 8:30 AM, 9:30 AM) should be centered properly.
+   * The line must connect continuously between time slots:
+
+     * From 7:00 AM → connect to 7:30 AM
+     * From 7:30 AM → connect to 8:30 AM
+     * From 8:30 AM → connect to 9:30 AM
+   * Each segment of the line should start from the center of one time label and end at the center of the next time label.
+   * The line should appear as one continuous vertical connector across all time slots.
+   * Ensure alignment is visually centered relative to the time labels.
+
+6. Custom Icon Support:
+
+   * The system should allow dynamic/custom icons to be added for tasks in the future.
+   * Users should be able to upload or assign their own icons (e.g., download icon, custom symbols).
+   * Custom icons should follow the same size, alignment, and style rules as default icons.
+   * The UI should automatically adapt without breaking layout or spacing.
+
+7. Keep all other UI elements exactly the same:
+
+   * Duration badges
+   * Check circles
+   * Colors and theme
+   * Layout and spacing
+
+8. Icons should be extendable for future tasks such as:
+
+   * Programming → code icon
+   * Study → book icon
+   * Daily routine → calendar/check icon
+
+Strictly follow these instructions and do not introduce any additional changes.

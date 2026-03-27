@@ -35,6 +35,29 @@ function getCategory(colorValue: string) {
   return CATEGORY_MAP[colorValue] ?? { label: "TASK", icon: "check-square", color: "#5F6368" };
 }
 
+// ── Task icon mapping (keyword-based, extensible) ─────────────────────────────
+function getTaskIcon(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("meditat") || t.includes("mindful") || t.includes("lotus") || t.includes("zen") || t.includes("breathe")) return "wind";
+  if (t.includes("run") || t.includes("jog") || t.includes("sprint") || t.includes("marathon")) return "activity";
+  if (t.includes("breakfast") || t.includes("coffee") || t.includes("tea") || t.includes("brunch")) return "coffee";
+  if (t.includes("lunch") || t.includes("dinner") || t.includes("meal") || t.includes("eat") || t.includes("food")) return "sunset";
+  if (t.includes("deep work") || t.includes("laptop") || t.includes("computer") || t.includes("coding")) return "monitor";
+  if (t.includes("code") || t.includes("program") || t.includes("engineer") || t.includes("develop")) return "code";
+  if (t.includes("study") || t.includes("book") || t.includes("read") || t.includes("learn")) return "book";
+  if (t.includes("meeting") || t.includes("standup") || t.includes("call") || t.includes("team") || t.includes("interview")) return "users";
+  if (t.includes("exercise") || t.includes("gym") || t.includes("workout") || t.includes("lift")) return "zap";
+  if (t.includes("walk") || t.includes("stroll") || t.includes("hike")) return "navigation";
+  if (t.includes("email") || t.includes("admin") || t.includes("mail") || t.includes("inbox")) return "mail";
+  if (t.includes("plan") || t.includes("review") || t.includes("schedule") || t.includes("organize")) return "clipboard";
+  if (t.includes("health") || t.includes("wellness") || t.includes("yoga") || t.includes("stretch")) return "heart";
+  if (t.includes("routine") || t.includes("daily") || t.includes("habit")) return "calendar";
+  if (t.includes("work") || t.includes("project") || t.includes("task")) return "briefcase";
+  if (t.includes("shower") || t.includes("grooming") || t.includes("prep")) return "droplet";
+  if (t.includes("sleep") || t.includes("nap") || t.includes("rest")) return "moon";
+  return "check-square";
+}
+
 // ── Card background color ──────────────────────────────────────────────────────
 function getCardBg(colorValue: string, isDark: boolean) {
   if (isDark) return AppColors.dark.cardBackground;
@@ -134,6 +157,15 @@ function TimelineCard({
   const timeLabel = task.startTime ? formatTime(task.startTime, timeFormat) : "";
   const [timePart, ampm] = timeLabel.split(" ");
 
+  const endTimeLabel = task.startTime
+    ? formatTime(
+        new Date(new Date(task.startTime).getTime() + task.durationMinutes * 60000).toISOString(),
+        timeFormat
+      )
+    : "";
+  const timeRangeLabel = timeLabel && endTimeLabel ? `${timeLabel} – ${endTimeLabel}` : "";
+  const taskIcon = getTaskIcon(task.title);
+
   const scale = useRef(new Animated.Value(1)).current;
   const handleToggle = () => {
     Animated.sequence([
@@ -164,12 +196,14 @@ function TimelineCard({
           },
         ]}
       >
-        {/* Category badge */}
+        {/* Time range badge */}
         <View style={tlStyles.cardTopRow}>
-          <View style={[tlStyles.badge, { backgroundColor: task.colorValue + "40" }]}>
-            <Feather name={category.icon as any} size={11} color={category.color} />
-            <Text style={[tlStyles.badgeText, { color: category.color }]}>{category.label}</Text>
-          </View>
+          {timeRangeLabel ? (
+            <View style={[tlStyles.badge, { backgroundColor: task.colorValue + "40" }]}>
+              <Feather name="clock" size={11} color={category.color} />
+              <Text style={[tlStyles.badgeText, { color: category.color }]}>{timeRangeLabel}</Text>
+            </View>
+          ) : null}
           {task.isCompleted && (
             <View style={[tlStyles.badge, { backgroundColor: "#E8F5E9" }]}>
               <Feather name="check" size={11} color="#2E7D52" />
@@ -178,19 +212,23 @@ function TimelineCard({
           )}
         </View>
 
-        {/* Title */}
-        <Text
-          style={[
-            tlStyles.title,
-            {
-              color: colors.label,
-              textDecorationLine: task.isCompleted ? "line-through" : "none",
-            },
-          ]}
-          numberOfLines={2}
-        >
-          {task.title}
-        </Text>
+        {/* Title with icon */}
+        <View style={tlStyles.titleRow}>
+          <Feather name={taskIcon as any} size={18} color={category.color} />
+          <Text
+            style={[
+              tlStyles.title,
+              {
+                color: colors.label,
+                textDecorationLine: task.isCompleted ? "line-through" : "none",
+                flex: 1,
+              },
+            ]}
+            numberOfLines={2}
+          >
+            {task.title}
+          </Text>
+        </View>
 
         {/* Notes */}
         {task.notes ? (
@@ -264,6 +302,7 @@ const tlStyles = StyleSheet.create({
   },
   badgeText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
 
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontSize: 18, fontFamily: "Inter_700Bold", lineHeight: 24 },
   notes: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
 
@@ -425,8 +464,8 @@ const styles = StyleSheet.create({
 
   timelineLine: {
     position: "absolute",
-    left: 59,
-    top: 20,
+    left: 60,
+    top: 30,
     bottom: 0,
     width: 1,
   },
