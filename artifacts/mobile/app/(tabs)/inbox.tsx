@@ -50,7 +50,11 @@ function TaskCard({
   const colors = isDark ? AppColors.dark : AppColors.light;
 
   return (
-    <TouchableOpacity onPress={onPress} style={styles.taskCard} activeOpacity={0.85}>
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.taskCard, { backgroundColor: colors.cardBackground }]}
+      activeOpacity={0.85}
+    >
       {/* Left colored strip */}
       <View style={[styles.cardStrip, { backgroundColor: task.colorValue }]} />
 
@@ -241,7 +245,6 @@ const styles = StyleSheet.create({
 
   taskCard: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: "#FFFFFF",
     borderRadius: 16, overflow: "hidden",
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.07, shadowRadius: 4, elevation: 2,
