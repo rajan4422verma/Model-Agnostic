@@ -2,13 +2,13 @@ import { BlurView } from "expo-blur";
 import { Feather } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppColors from "@/constants/colors";
+import { useIsDark } from "@/hooks/useIsDark";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useIsDark();
   const insets = useSafeAreaInsets();
 
   return (

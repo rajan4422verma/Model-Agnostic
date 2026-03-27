@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useIsDark } from "@/hooks/useIsDark";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";

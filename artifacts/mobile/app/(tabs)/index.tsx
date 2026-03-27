@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
+import { useIsDark } from "@/hooks/useIsDark";
 import React, { useCallback, useMemo, useRef } from "react";
 import {
   Animated,
@@ -164,7 +165,17 @@ function TimelineCard({
       )
     : "";
   const timeRangeLabel = timeLabel && endTimeLabel ? `${timeLabel} – ${endTimeLabel}` : "";
-  const taskIcon = getTaskIcon(task.title);
+
+  // Use saved iconName on task, fall back to keyword detection
+  const taskIcon = (task.iconName && task.iconName !== "work" && task.iconName !== "self-improvement")
+    ? task.iconName
+    : getTaskIcon(task.title);
+
+  // Missed = uncompleted and end time is in the past
+  const isMissed = !task.isCompleted && !!task.startTime &&
+    new Date(task.startTime).getTime() + task.durationMinutes * 60000 < Date.now();
+
+  const dotColor = task.isCompleted ? "#2E7D52" : isMissed ? "#C0392B" : AppColors.light.primaryLight;
 
   const scale = useRef(new Animated.Value(1)).current;
   const handleToggle = () => {
@@ -177,26 +188,22 @@ function TimelineCard({
 
   return (
     <View style={tlStyles.row}>
-      {/* Time label */}
+      {/* Time label — vertically centered in the row */}
       <View style={tlStyles.timeCol}>
-        <Text style={[tlStyles.timeMain, { color: colors.label }]}>{timePart}</Text>
-        {ampm ? <Text style={[tlStyles.timeAmpm, { color: colors.tertiaryLabel }]}>{ampm}</Text> : null}
-        <View style={[tlStyles.timeDot, { backgroundColor: AppColors.light.primaryLight }]} />
+        <View style={tlStyles.timeTextWrap}>
+          <Text style={[tlStyles.timeMain, { color: colors.label }]}>{timePart}</Text>
+          {ampm ? <Text style={[tlStyles.timeAmpm, { color: colors.tertiaryLabel }]}>{ampm}</Text> : null}
+        </View>
+        <View style={[tlStyles.timeDot, { backgroundColor: dotColor }]} />
       </View>
 
       {/* Card */}
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.88}
-        style={[
-          tlStyles.card,
-          {
-            backgroundColor: cardBg,
-            opacity: task.isCompleted ? 0.6 : 1,
-          },
-        ]}
+        style={[tlStyles.card, { backgroundColor: cardBg, opacity: task.isCompleted ? 0.75 : 1 }]}
       >
-        {/* Time range badge */}
+        {/* Time range badge row */}
         <View style={tlStyles.cardTopRow}>
           {timeRangeLabel ? (
             <View style={[tlStyles.badge, { backgroundColor: task.colorValue + "40" }]}>
@@ -210,11 +217,19 @@ function TimelineCard({
               <Text style={[tlStyles.badgeText, { color: "#2E7D52" }]}>DONE</Text>
             </View>
           )}
+          {isMissed && (
+            <View style={[tlStyles.badge, { backgroundColor: "#FDEDEC" }]}>
+              <Feather name="alert-circle" size={11} color="#C0392B" />
+              <Text style={[tlStyles.badgeText, { color: "#C0392B" }]}>MISSED</Text>
+            </View>
+          )}
         </View>
 
-        {/* Title with icon */}
+        {/* Icon in colorful circle + title */}
         <View style={tlStyles.titleRow}>
-          <Feather name={taskIcon as any} size={18} color={category.color} />
+          <View style={[tlStyles.iconCircle, { backgroundColor: task.colorValue + "50" }]}>
+            <Feather name={taskIcon as any} size={22} color={category.color} />
+          </View>
           <Text
             style={[
               tlStyles.title,
@@ -237,7 +252,7 @@ function TimelineCard({
           </Text>
         ) : null}
 
-        {/* Footer row */}
+        {/* Footer — duration only (checkbox moved outside) */}
         <View style={tlStyles.cardFooter}>
           <View style={[tlStyles.durationPill, { backgroundColor: colors.separator }]}>
             <Feather name="clock" size={10} color={colors.tertiaryLabel} />
@@ -245,43 +260,46 @@ function TimelineCard({
               {formatDuration(task.durationMinutes)}
             </Text>
           </View>
-
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <TouchableOpacity
-              onPress={handleToggle}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[
-                tlStyles.checkBtn,
-                {
-                  backgroundColor: task.isCompleted ? AppColors.light.primary : "transparent",
-                  borderColor: task.isCompleted ? AppColors.light.primary : colors.separatorStrong,
-                },
-              ]}
-            >
-              {task.isCompleted && <Feather name="check" size={12} color="#FFF" />}
-            </TouchableOpacity>
-          </Animated.View>
         </View>
       </TouchableOpacity>
+
+      {/* Checkbox — outside card, vertically centered */}
+      <Animated.View style={[tlStyles.checkWrap, { transform: [{ scale }] }]}>
+        <TouchableOpacity
+          onPress={handleToggle}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={[
+            tlStyles.checkBtn,
+            {
+              backgroundColor: task.isCompleted ? "#2E7D52" : isMissed ? "#C0392B" : "transparent",
+              borderColor: task.isCompleted ? "#2E7D52" : isMissed ? "#C0392B" : colors.separatorStrong,
+            },
+          ]}
+        >
+          {task.isCompleted && <Feather name="check" size={14} color="#FFF" />}
+          {isMissed && !task.isCompleted && <Feather name="x" size={12} color="#FFF" />}
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
 
 const tlStyles = StyleSheet.create({
-  row: { flexDirection: "row", paddingRight: 16, marginBottom: 16, alignItems: "flex-start" },
+  row: { flexDirection: "row", paddingRight: 8, marginBottom: 16, alignItems: "center" },
 
   timeCol: {
     width: 64,
     paddingLeft: 16,
-    paddingTop: 14,
-    alignItems: "flex-start",
-    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "stretch",
   },
-  timeMain: { fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  timeTextWrap: { flex: 1, alignItems: "flex-start", justifyContent: "center" },
+  timeMain: { fontSize: 15, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
   timeAmpm: { fontSize: 10, fontFamily: "Inter_500Medium", marginTop: 1 },
   timeDot: {
-    width: 8, height: 8, borderRadius: 4,
-    position: "absolute", right: -4, top: 18,
+    width: 9, height: 9, borderRadius: 5,
+    marginRight: -4.5,
   },
 
   card: {
@@ -302,18 +320,24 @@ const tlStyles = StyleSheet.create({
   },
   badgeText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
 
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold", lineHeight: 24 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  title: { fontSize: 17, fontFamily: "Inter_700Bold", lineHeight: 23 },
   notes: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
 
-  cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  cardFooter: { flexDirection: "row", alignItems: "center" },
   durationPill: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10,
   },
   durationText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+
+  checkWrap: { paddingHorizontal: 8, alignItems: "center", justifyContent: "center" },
   checkBtn: {
-    width: 28, height: 28, borderRadius: 14,
+    width: 32, height: 32, borderRadius: 16,
     borderWidth: 2, alignItems: "center", justifyContent: "center",
   },
 });
@@ -321,8 +345,7 @@ const tlStyles = StyleSheet.create({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useIsDark();
   const colors = isDark ? AppColors.dark : AppColors.light;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 110 : insets.bottom + 90;
@@ -381,10 +404,21 @@ export default function ScheduleScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-      {/* Month/Year + count */}
+      {/* Month/Year + count + calendar icon */}
       <View style={[styles.monthSection, { backgroundColor: colors.scaffoldBackground, paddingTop: topPad + 8 }]}>
-        <Text style={[styles.monthTitle, { color: colors.label }]}>{monthYear}</Text>
-        <Text style={[styles.taskCount, { color: colors.tertiaryLabel }]}>{taskCountLabel}</Text>
+        <View style={styles.monthRow}>
+          <View style={styles.monthTextCol}>
+            <Text style={[styles.monthTitle, { color: colors.label }]}>{monthYear}</Text>
+            <Text style={[styles.taskCount, { color: colors.tertiaryLabel }]}>{taskCountLabel}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.calIconBtn, { backgroundColor: colors.cardBackground }]}
+            onPress={() => router.push("/(tabs)/calendar")}
+            activeOpacity={0.8}
+          >
+            <Feather name="calendar" size={20} color={AppColors.light.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Week strip */}
@@ -448,6 +482,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 12,
+  },
+  monthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  monthTextCol: { flex: 1 },
+  calIconBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   monthTitle: {
     fontSize: 32,

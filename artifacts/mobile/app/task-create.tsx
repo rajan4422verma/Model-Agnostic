@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useIsDark } from "@/hooks/useIsDark";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -18,6 +19,31 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppColors from "@/constants/colors";
 import { RecurrenceType, useTaskContext } from "@/context/TaskContext";
 import { todayStr } from "@/utils/dateUtils";
+
+const ICON_OPTIONS: { name: string; label: string }[] = [
+  { name: "wind", label: "Meditate" },
+  { name: "activity", label: "Run" },
+  { name: "coffee", label: "Coffee" },
+  { name: "monitor", label: "Work" },
+  { name: "book", label: "Study" },
+  { name: "users", label: "Meeting" },
+  { name: "zap", label: "Workout" },
+  { name: "heart", label: "Health" },
+  { name: "code", label: "Code" },
+  { name: "mail", label: "Email" },
+  { name: "calendar", label: "Schedule" },
+  { name: "sun", label: "Morning" },
+  { name: "moon", label: "Sleep" },
+  { name: "droplet", label: "Hydrate" },
+  { name: "clipboard", label: "Plan" },
+  { name: "navigation", label: "Commute" },
+  { name: "check-square", label: "Task" },
+  { name: "briefcase", label: "Project" },
+  { name: "music", label: "Music" },
+  { name: "camera", label: "Photo" },
+  { name: "shopping-cart", label: "Shop" },
+  { name: "home", label: "Home" },
+];
 
 const DURATION_OPTIONS = [
   { label: "1", value: 1 },
@@ -179,8 +205,7 @@ function StepDot({ active, isDark }: { active: boolean; isDark: boolean }) {
 export default function TaskCreateScreen() {
   const { date, inbox } = useLocalSearchParams<{ date?: string; inbox?: string }>();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useIsDark();
   const colors = isDark ? AppColors.dark : AppColors.light;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -192,6 +217,8 @@ export default function TaskCreateScreen() {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedColor, setSelectedColor] = useState(AppColors.primary);
+  const [selectedIcon, setSelectedIcon] = useState("check-square");
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [duration, setDuration] = useState(30);
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");
   const [startHour, setStartHour] = useState(9);
@@ -232,7 +259,7 @@ export default function TaskCreateScreen() {
       startTime,
       durationMinutes: duration,
       colorValue: selectedColor,
-      iconName: "work",
+      iconName: selectedIcon,
       isCompleted: false,
       subtasks: [],
       recurrence,
@@ -291,9 +318,13 @@ export default function TaskCreateScreen() {
         </View>
 
         <View style={styles.heroContent}>
-          <View style={[styles.heroIconCircle]}>
-            <View style={[styles.heroIconDot]} />
-          </View>
+          <TouchableOpacity
+            style={[styles.heroIconCircle]}
+            onPress={() => setShowIconPicker((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <Feather name={selectedIcon as any} size={24} color="#FFF" />
+          </TouchableOpacity>
           <TextInput
             style={styles.heroTitleInput}
             placeholder="Task title"
@@ -317,6 +348,49 @@ export default function TaskCreateScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Icon picker */}
+        {showIconPicker && (
+          <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.cardSectionTitle, { color: colors.label }]}>Choose Icon</Text>
+            <View style={styles.iconGrid}>
+              {ICON_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.name}
+                  onPress={() => {
+                    setSelectedIcon(opt.name);
+                    setShowIconPicker(false);
+                    if (hapticsEnabled) Haptics.selectionAsync();
+                  }}
+                  style={[
+                    styles.iconGridItem,
+                    {
+                      backgroundColor:
+                        selectedIcon === opt.name ? selectedColor + "30" : colors.separator + "60",
+                      borderWidth: selectedIcon === opt.name ? 2 : 0,
+                      borderColor: selectedColor,
+                    },
+                  ]}
+                  activeOpacity={0.75}
+                >
+                  <Feather
+                    name={opt.name as any}
+                    size={22}
+                    color={selectedIcon === opt.name ? selectedColor : colors.label}
+                  />
+                  <Text
+                    style={[
+                      styles.iconGridLabel,
+                      { color: selectedIcon === opt.name ? selectedColor : colors.tertiaryLabel },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Step 0: Title + suggestions */}
         {step === 0 && !isInbox && (
           <>
@@ -700,6 +774,26 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     padding: 16,
     paddingBottom: 10,
+  },
+  iconGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+    gap: 8,
+  },
+  iconGridItem: {
+    width: 68,
+    height: 68,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  iconGridLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
   },
   notesInput: {
     fontSize: 15,
