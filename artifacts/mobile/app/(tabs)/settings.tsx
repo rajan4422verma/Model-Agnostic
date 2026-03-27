@@ -16,67 +16,67 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppColors from "@/constants/colors";
 import { useTaskContext } from "@/context/TaskContext";
 
+function AppHeader() {
+  return (
+    <View style={styles.darkHeader}>
+      <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>
+        <Feather name="menu" size={22} color="#FFF" />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>The Mindful Canvas</Text>
+      <TouchableOpacity style={styles.avatarBtn} activeOpacity={0.7}>
+        <View style={styles.avatar}>
+          <Feather name="user" size={18} color="#FFF" />
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function SettingsRow({
   icon,
+  iconBg,
+  iconColor,
   label,
+  sublabel,
   value,
+  rightEl,
   onPress,
-  rightElement,
   isDark,
   isLast,
 }: {
   icon: string;
+  iconBg?: string;
+  iconColor?: string;
   label: string;
+  sublabel?: string;
   value?: string;
+  rightEl?: React.ReactNode;
   onPress?: () => void;
-  rightElement?: React.ReactNode;
   isDark: boolean;
   isLast?: boolean;
 }) {
   const colors = isDark ? AppColors.dark : AppColors.light;
-
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={!onPress}
+      disabled={!onPress && !rightEl}
+      activeOpacity={onPress ? 0.6 : 1}
       style={[
-        styles.row,
+        styles.settRow,
         !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
       ]}
-      activeOpacity={onPress ? 0.6 : 1}
     >
-      <View style={[styles.rowIcon, { backgroundColor: AppColors.primary + '18' }]}>
-        <Feather name={icon as any} size={15} color={AppColors.primary} />
+      <View style={[styles.settIcon, { backgroundColor: iconBg ?? AppColors.light.primaryBg }]}>
+        <Feather name={icon as any} size={16} color={iconColor ?? AppColors.light.primary} />
       </View>
-      <Text style={[styles.rowLabel, { color: colors.label }]}>{label}</Text>
-      <View style={styles.rowRight}>
-        {value && <Text style={[styles.rowValue, { color: colors.tertiaryLabel }]}>{value}</Text>}
-        {rightElement}
-        {onPress && !rightElement && (
-          <Feather name="chevron-right" size={16} color={colors.tertiaryLabel} />
-        )}
+      <View style={styles.settText}>
+        <Text style={[styles.settLabel, { color: colors.label }]}>{label}</Text>
+        {sublabel ? <Text style={[styles.settSub, { color: colors.tertiaryLabel }]}>{sublabel}</Text> : null}
       </View>
+      {value ? <Text style={[styles.settValue, { color: colors.tertiaryLabel }]}>{value}</Text> : null}
+      {rightEl}
+      {onPress && !rightEl && <Feather name="chevron-right" size={15} color={colors.tertiaryLabel} />}
     </TouchableOpacity>
-  );
-}
-
-function Section({
-  title,
-  children,
-  isDark,
-}: {
-  title: string;
-  children: React.ReactNode;
-  isDark: boolean;
-}) {
-  const colors = isDark ? AppColors.dark : AppColors.light;
-  return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.tertiaryLabel }]}>{title}</Text>
-      <View style={[styles.sectionCard, { backgroundColor: colors.cardBackground }]}>
-        {children}
-      </View>
-    </View>
   );
 }
 
@@ -86,119 +86,194 @@ export default function SettingsScreen() {
   const isDark = colorScheme === "dark";
   const colors = isDark ? AppColors.dark : AppColors.light;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 120 : insets.bottom + 100;
 
   const {
-    themeMode,
-    setThemeMode,
-    firstDayOfWeek,
-    setFirstDayOfWeek,
-    timeFormat,
-    setTimeFormat,
-    hapticsEnabled,
-    setHapticsEnabled,
+    hapticsEnabled, setHapticsEnabled,
+    timeFormat, setTimeFormat,
+    firstDayOfWeek, setFirstDayOfWeek,
+    themeMode, setThemeMode,
   } = useTaskContext();
-
-  const themes: Array<"system" | "light" | "dark"> = ["system", "light", "dark"];
-  const themeLabels = { system: "System", light: "Light", dark: "Dark" };
-
-  const handleTheme = () => {
-    const next = themes[(themes.indexOf(themeMode) + 1) % 3];
-    if (hapticsEnabled) Haptics.selectionAsync();
-    setThemeMode(next);
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-        <Text style={[styles.headerSub, { color: colors.tertiaryLabel }]}>Preferences</Text>
-        <Text style={[styles.headerTitle, { color: colors.label }]}>Settings</Text>
+      <View style={{ paddingTop: topPad }}>
+        <AppHeader />
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: Platform.OS === "web" ? 118 : insets.bottom + 100 },
-        ]}
+        contentContainerStyle={{ paddingBottom: bottomPad, paddingTop: 20, gap: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        <Section title="Appearance" isDark={isDark}>
-          <SettingsRow
-            icon="sun"
-            label="Theme"
-            value={themeLabels[themeMode]}
-            onPress={handleTheme}
-            isDark={isDark}
-          />
-          <SettingsRow
-            icon="clock"
-            label="Time Format"
-            value={timeFormat === "12h" ? "12-hour" : "24-hour"}
-            onPress={() => {
-              if (hapticsEnabled) Haptics.selectionAsync();
-              setTimeFormat(timeFormat === "12h" ? "24h" : "12h");
-            }}
-            isDark={isDark}
-          />
-          <SettingsRow
-            icon="calendar"
-            label="Week Starts On"
-            value={firstDayOfWeek === 1 ? "Monday" : "Sunday"}
-            onPress={() => {
-              if (hapticsEnabled) Haptics.selectionAsync();
-              setFirstDayOfWeek(firstDayOfWeek === 1 ? 0 : 1);
-            }}
-            isDark={isDark}
-            isLast
-          />
-        </Section>
+        {/* Page title */}
+        <View style={styles.pageTitle}>
+          <Text style={[styles.pageTitleText, { color: colors.label }]}>Settings</Text>
+          <Text style={[styles.pageTitleSub, { color: colors.tertiaryLabel }]}>
+            Tailor your mindful journey. Manage your preferences, data synchronization, and premium features.
+          </Text>
+        </View>
 
-        <Section title="Interactions" isDark={isDark}>
-          <SettingsRow
-            icon="activity"
-            label="Haptic Feedback"
-            isDark={isDark}
-            isLast
-            rightElement={
-              <Switch
-                value={hapticsEnabled}
-                onValueChange={(val) => {
-                  if (val) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setHapticsEnabled(val);
-                }}
-                trackColor={{
-                  false: colors.separator,
-                  true: AppColors.primary + '99',
-                }}
-                thumbColor={hapticsEnabled ? AppColors.primary : colors.tertiaryLabel}
-                ios_backgroundColor={colors.separator}
-              />
-            }
-          />
-        </Section>
+        {/* PRO card */}
+        <View style={styles.proCard}>
+          <View style={styles.proCardTop}>
+            <View style={styles.proBadge}>
+              <Text style={styles.proBadgeText}>PRO FEATURE</Text>
+            </View>
+            <Text style={styles.proTitle}>Unlock Your{"\n"}Potential</Text>
+            <Text style={styles.proSub}>
+              Get unlimited projects, advanced analytics, and priority cloud sync across all your devices.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.upgradeBtn} activeOpacity={0.85}>
+            <Text style={[styles.upgradeBtnText, { color: colors.proCardBg }]}>Upgrade to Pro</Text>
+          </TouchableOpacity>
+        </View>
 
-        <Section title="Task Colors" isDark={isDark}>
-          <View style={styles.colorsGrid}>
-            {AppColors.taskColors.map((c) => (
-              <View
-                key={c}
-                style={[styles.colorSwatch, { backgroundColor: c }]}
-              />
+        {/* General preferences */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>GENERAL PREFERENCES</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBackground }]}>
+            <SettingsRow
+              icon="cloud"
+              iconBg="#E8F0FE"
+              iconColor="#1A73E8"
+              label="Sync with iCloud"
+              sublabel="Keep your data safe and updated everywhere"
+              isDark={isDark}
+              rightEl={
+                <Switch
+                  value={true}
+                  trackColor={{ false: colors.separator, true: AppColors.light.primaryLight }}
+                  thumbColor={AppColors.light.primary}
+                  ios_backgroundColor={colors.separator}
+                />
+              }
+            />
+            <SettingsRow
+              icon="bell"
+              iconBg="#FCE8EA"
+              iconColor="#D93025"
+              label="Import Reminders"
+              sublabel="Seamlessly merge your existing iOS lists"
+              isDark={isDark}
+              rightEl={
+                <TouchableOpacity style={[styles.connectBtn, { borderColor: AppColors.light.primary }]}>
+                  <Text style={[styles.connectBtnText, { color: AppColors.light.primary }]}>Connect</Text>
+                </TouchableOpacity>
+              }
+            />
+            <SettingsRow
+              icon="bell"
+              iconBg={AppColors.light.primaryBg}
+              iconColor={AppColors.light.primary}
+              label="Notifications"
+              sublabel="Gentle nudges for your mindful moments"
+              isDark={isDark}
+              isLast
+              rightEl={
+                <Switch
+                  value={hapticsEnabled}
+                  onValueChange={(val) => {
+                    if (val) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setHapticsEnabled(val);
+                  }}
+                  trackColor={{ false: colors.separator, true: AppColors.light.primaryLight }}
+                  thumbColor={hapticsEnabled ? AppColors.light.primary : colors.tertiaryLabel}
+                  ios_backgroundColor={colors.separator}
+                />
+              }
+            />
+          </View>
+        </View>
+
+        {/* Appearance */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>APPEARANCE</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBackground }]}>
+            <SettingsRow
+              icon="sun"
+              label="Theme"
+              value={themeMode === "system" ? "System" : themeMode === "light" ? "Light" : "Dark"}
+              onPress={() => {
+                const modes: Array<"system" | "light" | "dark"> = ["system", "light", "dark"];
+                const next = modes[(modes.indexOf(themeMode) + 1) % 3];
+                if (hapticsEnabled) Haptics.selectionAsync();
+                setThemeMode(next);
+              }}
+              isDark={isDark}
+            />
+            <SettingsRow
+              icon="clock"
+              label="Time Format"
+              value={timeFormat === "12h" ? "12-hour" : "24-hour"}
+              onPress={() => {
+                if (hapticsEnabled) Haptics.selectionAsync();
+                setTimeFormat(timeFormat === "12h" ? "24h" : "12h");
+              }}
+              isDark={isDark}
+            />
+            <SettingsRow
+              icon="calendar"
+              label="Week Starts On"
+              value={firstDayOfWeek === 1 ? "Monday" : "Sunday"}
+              onPress={() => {
+                if (hapticsEnabled) Haptics.selectionAsync();
+                setFirstDayOfWeek(firstDayOfWeek === 1 ? 0 : 1);
+              }}
+              isDark={isDark}
+              isLast
+            />
+          </View>
+        </View>
+
+        {/* Sync devices */}
+        <View style={[styles.syncCard, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.syncIcons}>
+            <View style={[styles.syncIcon, { backgroundColor: AppColors.light.primaryBg }]}>
+              <Feather name="smartphone" size={18} color={AppColors.light.primary} />
+            </View>
+            <View style={[styles.syncIcon, { backgroundColor: "#E8F0FE" }]}>
+              <Feather name="zap" size={18} color="#1A73E8" />
+            </View>
+          </View>
+          <Text style={[styles.syncTitle, { color: colors.label }]}>Sync across all devices</Text>
+          <Text style={[styles.syncSub, { color: colors.tertiaryLabel }]}>
+            Your mindful practice should never be interrupted. Start a task on your phone, track it on your laptop, and review it on your tablet.
+          </Text>
+          <View style={styles.platformPills}>
+            {["iOS", "macOS", "Web"].map((p) => (
+              <View key={p} style={[styles.platformPill, { backgroundColor: colors.separator }]}>
+                <Text style={[styles.platformPillText, { color: colors.secondaryLabel }]}>{p}</Text>
+              </View>
             ))}
           </View>
-        </Section>
+        </View>
 
-        <Section title="About" isDark={isDark}>
-          <SettingsRow icon="info" label="Version" value="1.0.0" isDark={isDark} />
-          <SettingsRow
-            icon="heart"
-            label="Structured Daily Planner"
-            value=""
-            isDark={isDark}
-            isLast
-          />
-        </Section>
+        {/* Profile */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>YOUR PROFILE</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.cardBackground }]}>
+            <View style={styles.profileRow}>
+              <View style={[styles.profileAvatar, { backgroundColor: AppColors.light.primaryLight }]}>
+                <Feather name="user" size={22} color={AppColors.light.primary} />
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={[styles.profileName, { color: colors.label }]}>You</Text>
+                <Text style={[styles.profileSince, { color: colors.tertiaryLabel }]}>Free Member</Text>
+              </View>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.separator }]} />
+            <SettingsRow icon="user" label="Account Details" onPress={() => {}} isDark={isDark} />
+            <SettingsRow icon="shield" label="Privacy & Security" onPress={() => {}} isDark={isDark} isLast />
+          </View>
+        </View>
+
+        {/* Log out */}
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.cardBackground }]}>
+          <Feather name="log-out" size={16} color="#D93025" />
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -206,80 +281,99 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+
+  darkHeader: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: "#1C1B1F",
   },
-  headerSub: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    marginBottom: 2,
+  headerIconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 17, fontFamily: "Inter_600SemiBold", color: "#FFFFFF" },
+  avatarBtn: { alignItems: "flex-end" },
+  avatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.3)",
   },
-  headerTitle: {
-    fontSize: 26,
-    fontFamily: "Inter_700Bold",
-  },
+
   scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    gap: 24,
+
+  pageTitle: { paddingHorizontal: 20, gap: 6 },
+  pageTitleText: { fontSize: 28, fontFamily: "Inter_700Bold" },
+  pageTitleSub: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+
+  proCard: {
+    marginHorizontal: 16, borderRadius: 20, overflow: "hidden",
+    backgroundColor: "#6D2B37",
   },
-  section: { gap: 6 },
-  sectionTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    marginLeft: 4,
+  proCardTop: { padding: 20, gap: 8 },
+  proBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  proBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.8 },
+  proTitle: { fontSize: 24, fontFamily: "Inter_700Bold", color: "#FFFFFF", lineHeight: 30 },
+  proSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", lineHeight: 18 },
+  upgradeBtn: {
+    backgroundColor: "#FFFFFF", marginHorizontal: 20, marginBottom: 20,
+    borderRadius: 14, paddingVertical: 14, alignItems: "center",
+  },
+  upgradeBtnText: { fontSize: 15, fontFamily: "Inter_700Bold" },
+
+  section: { gap: 8, paddingHorizontal: 16 },
+  sectionLabel: {
+    fontSize: 11, fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.8, textTransform: "uppercase", marginLeft: 4,
   },
   sectionCard: {
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 16, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    gap: 12,
-    minHeight: 52,
+
+  settRow: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 12, gap: 12, minHeight: 56,
   },
-  rowIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
+  settIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  settText: { flex: 1 },
+  settLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  settSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
+  settValue: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  connectBtn: {
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: 12, borderWidth: 1.5,
   },
-  rowLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
+  connectBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  syncCard: {
+    marginHorizontal: 16, borderRadius: 16, padding: 20, gap: 10,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
-  rowRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  syncIcons: { flexDirection: "row", gap: 8 },
+  syncIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  syncTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  syncSub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  platformPills: { flexDirection: "row", gap: 8 },
+  platformPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14 },
+  platformPillText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+
+  profileRow: { flexDirection: "row", alignItems: "center", padding: 16, gap: 14 },
+  profileAvatar: { width: 50, height: 50, borderRadius: 25, alignItems: "center", justifyContent: "center" },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  profileSince: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
+  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 16 },
+
+  logoutBtn: {
+    marginHorizontal: 16, borderRadius: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 14,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
-  rowValue: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
-  colorsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    padding: 16,
-  },
-  colorSwatch: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
+  logoutText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#D93025" },
 });

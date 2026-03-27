@@ -1,56 +1,71 @@
+// "Luminous Day" palette from Stitch design
 export const AppColors = {
-  // Primary coral
-  primary: '#F07B6B',
-  primaryLight: '#F9AFA7',
-  primaryDark: '#D4574A',
-  primaryBg: '#FEF2F0',
+  // Primary rose
+  primary: '#C2515E',       // dark rose (buttons, active states)
+  primaryLight: '#F5B4B6',  // soft rose (icon bg tints, highlights)
+  primaryDark: '#8B3644',   // deep rose
+  primaryBg: '#FFF0F1',     // very pale rose tint
 
-  // Task accent colors (same style as Structured app)
+  // Secondary
+  secondaryBlue: '#1A73E8', // Google blue (e.g. Outlook badge)
+
+  // Neutrals
+  textDark: '#202124',
+  textMed: '#5F6368',
+  textLight: '#9AA0A6',
+
+  // Task icon colors (soft pastels)
   taskColors: [
-    '#F07B6B', // coral
-    '#5DB8D4', // teal blue
-    '#7C9FE5', // blue
-    '#E67E8A', // pink red
-    '#70C17A', // green
-    '#F0A85B', // orange
-    '#A07EE0', // purple
-    '#5DC4A8', // mint
-    '#E07BB5', // rose
-    '#5A9ED6', // sky blue
+    '#F5B4B6', // rose
+    '#A8D5E2', // sky blue
+    '#A8D8A8', // mint green
+    '#F9D5A7', // peach
+    '#C4B5E8', // lavender
+    '#F4B8D0', // pink
+    '#B5D5C5', // sage
+    '#F5C9A0', // apricot
+    '#AECBFA', // periwinkle
+    '#FDD8AA', // amber light
   ],
 
   light: {
-    scaffoldBackground: '#F8F0EE',
+    scaffoldBackground: '#F5F5F5',
     cardBackground: '#FFFFFF',
-    label: '#1A1A1A',
-    secondaryLabel: '#4A4A4A',
-    tertiaryLabel: '#9A9A9A',
-    separator: '#EDE8E7',
-    separatorStrong: '#D8D0CE',
-    primary: '#F07B6B',
-    primaryFaded: '#FEF0EE',
-    currentTimeRed: '#F07B6B',
-    tabIconDefault: '#B0A8A6',
-    tabIconSelected: '#F07B6B',
-    tint: '#F07B6B',
-    completionRing: '#E0D8D6',
+    headerBackground: '#1C1B1F',
+    label: '#202124',
+    secondaryLabel: '#5F6368',
+    tertiaryLabel: '#9AA0A6',
+    separator: '#E8EAED',
+    separatorStrong: '#D2D4D8',
+    primary: '#C2515E',
+    primaryLight: '#F5B4B6',
+    primaryBg: '#FFF0F1',
+    currentTimeRed: '#C2515E',
+    tabIconDefault: '#9AA0A6',
+    tabIconSelected: '#C2515E',
+    tint: '#C2515E',
+    completionRing: '#E8EAED',
+    proCardBg: '#6D2B37',
   },
 
   dark: {
-    scaffoldBackground: '#1A1212',
-    cardBackground: '#2A1F1E',
-    label: '#F5F0EF',
-    secondaryLabel: '#C8BFBD',
-    tertiaryLabel: '#7A706E',
-    separator: '#3A2F2E',
-    separatorStrong: '#4A3F3E',
-    primary: '#F07B6B',
-    primaryFaded: '#3A2520',
-    currentTimeRed: '#F07B6B',
-    tabIconDefault: '#7A706E',
-    tabIconSelected: '#F07B6B',
-    tint: '#F07B6B',
-    completionRing: '#4A3F3E',
+    scaffoldBackground: '#121212',
+    cardBackground: '#1E1E1E',
+    headerBackground: '#1C1B1F',
+    label: '#F1F3F4',
+    secondaryLabel: '#BDC1C6',
+    tertiaryLabel: '#9AA0A6',
+    separator: '#3C4043',
+    separatorStrong: '#5F6368',
+    primary: '#F5B4B6',
+    primaryLight: '#F5B4B6',
+    primaryBg: '#3A1F22',
+    currentTimeRed: '#F5B4B6',
+    tabIconDefault: '#9AA0A6',
+    tabIconSelected: '#F5B4B6',
+    tint: '#F5B4B6',
+    completionRing: '#3C4043',
+    proCardBg: '#4A1E26',
   },
 };
 
