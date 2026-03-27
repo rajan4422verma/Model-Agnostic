@@ -16,21 +16,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppColors from "@/constants/colors";
 import { useTaskContext } from "@/context/TaskContext";
 
-function AppHeader() {
-  return (
-    <View style={styles.darkHeader}>
-      <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>
-        <Feather name="menu" size={22} color="#FFF" />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>The Mindful Canvas</Text>
-      <TouchableOpacity style={styles.avatarBtn} activeOpacity={0.7}>
-        <View style={styles.avatar}>
-          <Feather name="user" size={18} color="#FFF" />
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 function SettingsRow({
   icon,
@@ -97,13 +82,9 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-      <View style={{ paddingTop: topPad }}>
-        <AppHeader />
-      </View>
-
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: bottomPad, paddingTop: 20, gap: 20 }}
+        contentContainerStyle={{ paddingBottom: bottomPad, paddingTop: topPad + 20, gap: 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Page title */}
@@ -281,21 +262,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  darkHeader: {
-    flexDirection: "row", alignItems: "center",
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: "#1C1B1F",
-  },
-  headerIconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", fontSize: 17, fontFamily: "Inter_600SemiBold", color: "#FFFFFF" },
-  avatarBtn: { alignItems: "flex-end" },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center", justifyContent: "center",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.3)",
-  },
 
   scroll: { flex: 1 },
 
