@@ -10,7 +10,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -140,6 +139,16 @@ export default function CalendarScreen() {
   };
 
   const selectedTasks = useMemo(() => getTasksForDate(selectedDate), [selectedDate, getTasksForDate]);
+
+  // Helper: task is missed if uncompleted and its end time has passed
+  const isMissed = (t: Task) =>
+    !t.isCompleted && !!t.startTime &&
+    new Date(t.startTime).getTime() + t.durationMinutes * 60000 < Date.now();
+
+  // Helper: task is "important" (had a reminder set or has subtasks)
+  const isImportant = (t: Task) =>
+    t.notificationMinutesBefore > 0 || t.subtasks.length > 0;
+
   const upcomingTasks = selectedTasks.filter((t) => !t.isCompleted);
   const completedTasks = selectedTasks.filter((t) => t.isCompleted);
 
@@ -231,44 +240,62 @@ export default function CalendarScreen() {
 
         {upcomingTasks.length > 0 ? (
           <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-            {upcomingTasks.map((task, idx) => (
-              <TouchableOpacity
-                key={task.id}
-                onPress={() => router.push({ pathname: "/task-detail", params: { taskId: task.id } })}
-                style={[
-                  styles.taskRow,
-                  idx < upcomingTasks.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
-                ]}
-              >
-                <View style={[styles.taskIcon, { backgroundColor: task.colorValue + "40" }]}>
-                  <View style={[styles.taskIconDot, { backgroundColor: task.colorValue }]} />
-                </View>
-                <View style={styles.taskContent}>
-                  <Text style={[styles.taskTitle, { color: colors.label }]} numberOfLines={1}>
-                    {task.title}
-                  </Text>
-                  {task.notes ? (
-                    <Text style={[styles.taskNotes, { color: colors.tertiaryLabel }]} numberOfLines={1}>
-                      {task.notes}
-                    </Text>
-                  ) : null}
-                  <View style={styles.taskMetaRow}>
-                    <Feather name="calendar" size={11} color={colors.tertiaryLabel} />
-                    <Text style={[styles.taskMetaText, { color: colors.tertiaryLabel }]}>
-                      {isToday(selectedDate) ? "Today" : selectedDate}
-                    </Text>
-                    {task.startTime && (
-                      <View style={[styles.badge, { backgroundColor: task.colorValue + "20" }]}>
-                        <Text style={[styles.badgeText, { color: task.colorValue }]}>
-                          {formatTimeRange(task.startTime, task.durationMinutes, "12h")}
-                        </Text>
-                      </View>
-                    )}
+            {upcomingTasks.map((task, idx) => {
+              const missed = isMissed(task);
+              const statusColor = missed ? "#C0392B" : task.colorValue;
+              return (
+                <TouchableOpacity
+                  key={task.id}
+                  onPress={() => router.push({ pathname: "/task-detail", params: { taskId: task.id } })}
+                  style={[
+                    styles.taskRow,
+                    idx < upcomingTasks.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+                    missed && { backgroundColor: "#FEF2F2" },
+                  ]}
+                >
+                  {/* Status indicator bar */}
+                  <View style={[styles.statusBar, { backgroundColor: statusColor }]} />
+
+                  <View style={[styles.taskIcon, { backgroundColor: statusColor + "30" }]}>
+                    {missed
+                      ? <Feather name="alert-circle" size={18} color="#C0392B" />
+                      : <View style={[styles.taskIconDot, { backgroundColor: task.colorValue }]} />
+                    }
                   </View>
-                </View>
-                <Feather name="chevron-right" size={16} color={colors.tertiaryLabel} />
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.taskContent}>
+                    <Text style={[styles.taskTitle, { color: missed ? "#C0392B" : colors.label }]} numberOfLines={1}>
+                      {task.title}
+                    </Text>
+                    {task.notes ? (
+                      <Text style={[styles.taskNotes, { color: colors.tertiaryLabel }]} numberOfLines={1}>
+                        {task.notes}
+                      </Text>
+                    ) : null}
+                    <View style={styles.taskMetaRow}>
+                      {missed
+                        ? <View style={styles.missedBadge}>
+                            <Text style={styles.missedBadgeText}>MISSED</Text>
+                          </View>
+                        : <>
+                            <Feather name="calendar" size={11} color={colors.tertiaryLabel} />
+                            <Text style={[styles.taskMetaText, { color: colors.tertiaryLabel }]}>
+                              {isToday(selectedDate) ? "Today" : selectedDate}
+                            </Text>
+                          </>
+                      }
+                      {task.startTime && (
+                        <View style={[styles.badge, { backgroundColor: statusColor + "20" }]}>
+                          <Text style={[styles.badgeText, { color: statusColor }]}>
+                            {formatTimeRange(task.startTime, task.durationMinutes, "12h")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.tertiaryLabel} />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
@@ -281,28 +308,49 @@ export default function CalendarScreen() {
         {/* Completed */}
         {completedTasks.length > 0 && (
           <>
-            <Text style={[styles.completedTitle, { color: colors.label }]}>Completed Today</Text>
+            <Text style={[styles.completedSectionTitle, { color: colors.label }]}>Completed</Text>
             <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-              {completedTasks.map((task, idx) => (
-                <View
-                  key={task.id}
-                  style={[
-                    styles.completedRow,
-                    idx < completedTasks.length - 1 && {
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: colors.separator,
-                    },
-                  ]}
-                >
-                  <Feather name="check-circle" size={18} color={AppColors.light.primary} />
-                  <Text style={[styles.completedTitle2, { color: colors.tertiaryLabel }]} numberOfLines={1}>
-                    {task.title}
-                  </Text>
-                  <Text style={[styles.completedDur, { color: colors.tertiaryLabel }]}>
-                    {formatDuration(task.durationMinutes)}
-                  </Text>
-                </View>
-              ))}
+              {completedTasks.map((task, idx) => {
+                const important = isImportant(task);
+                const checkColor = important ? "#1565C0" : "#2E7D52";
+                const checkBg = important ? "#E3F2FD" : "#E8F5E9";
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    onPress={() => router.push({ pathname: "/task-detail", params: { taskId: task.id } })}
+                    style={[
+                      styles.completedRow,
+                      idx < completedTasks.length - 1 && {
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: colors.separator,
+                      },
+                    ]}
+                  >
+                    {/* Status indicator bar */}
+                    <View style={[styles.statusBar, { backgroundColor: checkColor }]} />
+
+                    <View style={[styles.completedIconCircle, { backgroundColor: checkBg }]}>
+                      <Feather name="check" size={14} color={checkColor} />
+                    </View>
+                    <View style={styles.taskContent}>
+                      <Text style={[styles.completedTitle2, { color: colors.tertiaryLabel }]} numberOfLines={1}>
+                        {task.title}
+                      </Text>
+                      <View style={styles.taskMetaRow}>
+                        <View style={[styles.badge, { backgroundColor: checkBg }]}>
+                          <Text style={[styles.badgeText, { color: checkColor }]}>
+                            {important ? "IMPORTANT" : "DONE"}
+                          </Text>
+                        </View>
+                        <Text style={[styles.completedDur, { color: colors.tertiaryLabel }]}>
+                          {formatDuration(task.durationMinutes)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Feather name="chevron-right" size={16} color={colors.tertiaryLabel} />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </>
         )}
@@ -371,22 +419,26 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
-  taskRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  taskRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingRight: 14, gap: 12, overflow: "hidden" },
+  statusBar: { width: 4, alignSelf: "stretch", borderRadius: 2, marginLeft: -0 },
   taskIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   taskIconDot: { width: 14, height: 14, borderRadius: 7 },
   taskContent: { flex: 1, gap: 3 },
   taskTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   taskNotes: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  taskMetaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  taskMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   taskMetaText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  missedBadge: { backgroundColor: "#FDEDEC", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  missedBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#C0392B", letterSpacing: 0.3 },
 
   emptyCard: { marginHorizontal: 16, marginBottom: 16, borderRadius: 16, padding: 24, alignItems: "center" },
   emptyText: { fontSize: 15, fontFamily: "Inter_400Regular" },
 
-  completedTitle: { fontSize: 17, fontFamily: "Inter_700Bold", paddingHorizontal: 16, marginBottom: 10 },
-  completedRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 10 },
+  completedSectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold", paddingHorizontal: 16, marginBottom: 10 },
+  completedRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingRight: 14, gap: 10, overflow: "hidden" },
+  completedIconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   completedTitle2: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
   completedDur: { fontSize: 12, fontFamily: "Inter_400Regular" },
 });

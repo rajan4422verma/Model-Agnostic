@@ -178,12 +178,6 @@ function TimelineCard({
     ? task.iconName
     : getTaskIcon(task.title);
 
-  // Missed = uncompleted and end time is in the past
-  const isMissed = !task.isCompleted && !!task.startTime &&
-    new Date(task.startTime).getTime() + task.durationMinutes * 60000 < Date.now();
-
-  const dotColor = task.isCompleted ? "#2E7D52" : isMissed ? "#C0392B" : AppColors.light.primaryLight;
-
   const scale = useRef(new Animated.Value(1)).current;
   const handleToggle = () => {
     Animated.sequence([
@@ -201,7 +195,7 @@ function TimelineCard({
           <Text style={[tlStyles.timeMain, { color: colors.label }]}>{timePart}</Text>
           {ampm ? <Text style={[tlStyles.timeAmpm, { color: colors.tertiaryLabel }]}>{ampm}</Text> : null}
         </View>
-        <View style={[tlStyles.timeDot, { backgroundColor: dotColor }]} />
+        <View style={[tlStyles.timeDot, { backgroundColor: AppColors.light.primaryLight }]} />
       </View>
 
       {/* Card */}
@@ -222,12 +216,6 @@ function TimelineCard({
             <View style={[tlStyles.badge, { backgroundColor: "#E8F5E9" }]}>
               <Feather name="check" size={11} color="#2E7D52" />
               <Text style={[tlStyles.badgeText, { color: "#2E7D52" }]}>DONE</Text>
-            </View>
-          )}
-          {isMissed && (
-            <View style={[tlStyles.badge, { backgroundColor: "#FDEDEC" }]}>
-              <Feather name="alert-circle" size={11} color="#C0392B" />
-              <Text style={[tlStyles.badgeText, { color: "#C0392B" }]}>MISSED</Text>
             </View>
           )}
         </View>
@@ -278,13 +266,12 @@ function TimelineCard({
           style={[
             tlStyles.checkBtn,
             {
-              backgroundColor: task.isCompleted ? "#2E7D52" : isMissed ? "#C0392B" : "transparent",
-              borderColor: task.isCompleted ? "#2E7D52" : isMissed ? "#C0392B" : colors.separatorStrong,
+              backgroundColor: task.isCompleted ? AppColors.light.primary : "transparent",
+              borderColor: task.isCompleted ? AppColors.light.primary : colors.separatorStrong,
             },
           ]}
         >
           {task.isCompleted && <Feather name="check" size={14} color="#FFF" />}
-          {isMissed && !task.isCompleted && <Feather name="x" size={12} color="#FFF" />}
         </TouchableOpacity>
       </Animated.View>
     </View>
