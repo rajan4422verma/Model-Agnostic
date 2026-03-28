@@ -166,8 +166,15 @@ function TimelineCard({
     : "";
   const timeRangeLabel = timeLabel && endTimeLabel ? `${timeLabel} – ${endTimeLabel}` : "";
 
-  // Use saved iconName on task, fall back to keyword detection
-  const taskIcon = (task.iconName && task.iconName !== "work" && task.iconName !== "self-improvement")
+  // Validate iconName is a known Feather icon; fall back to keyword detection otherwise
+  const VALID_FEATHER_ICONS = new Set([
+    "wind","activity","coffee","monitor","book","users","zap","heart","code","mail",
+    "calendar","sun","moon","droplet","clipboard","navigation","check-square","briefcase",
+    "music","camera","shopping-cart","home","edit","file-text","pen-tool","compass",
+    "plus-circle","sunset","settings","star","flag","bell","map","battery","wifi",
+    "trending-up","award","target","inbox","layers","package","tool","user","check",
+  ]);
+  const taskIcon = (task.iconName && VALID_FEATHER_ICONS.has(task.iconName))
     ? task.iconName
     : getTaskIcon(task.title);
 

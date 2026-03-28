@@ -110,8 +110,7 @@ function MonthCalendar({
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useIsDark();
   const colors = isDark ? AppColors.dark : AppColors.light;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 100 : insets.bottom + 80;

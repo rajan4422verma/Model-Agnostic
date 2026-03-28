@@ -120,8 +120,7 @@ function MetaRow({
 export default function TaskDetailScreen() {
   const { taskId, fromInbox } = useLocalSearchParams<{ taskId: string; fromInbox?: string }>();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useIsDark();
   const colors = isDark ? AppColors.dark : AppColors.light;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 

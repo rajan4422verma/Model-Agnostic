@@ -68,8 +68,7 @@ function SettingsRow({
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const isDark = useIsDark();
   const colors = isDark ? AppColors.dark : AppColors.light;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 120 : insets.bottom + 100;
