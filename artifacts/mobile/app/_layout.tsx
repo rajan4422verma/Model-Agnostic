@@ -20,6 +20,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorFallback } from "@/components/ErrorFallback";
 import { TaskProvider } from "@/context/TaskContext";
 import { setupNotifications } from "@/utils/notifications";
+import { AuthProvider } from "@/context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,6 +29,7 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="task-detail"
@@ -62,27 +64,37 @@ export default function RootLayout() {
     // Request permissions and set up Android channel
     setupNotifications();
 
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === "web") return;
 
     // Foreground notification handler — shows an Alert with haptic
-    notifListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      const title = notification.request.content.title ?? "Task Starting";
-      const body = notification.request.content.body ?? "";
+    notifListener.current = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        const title = notification.request.content.title ?? "Task Starting";
+        const body = notification.request.content.body ?? "";
 
-      // Strong haptic pulse
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 300);
-      setTimeout(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning), 600);
+        // Strong haptic pulse
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setTimeout(
+          () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy),
+          300,
+        );
+        setTimeout(
+          () =>
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
+          600,
+        );
 
-      Alert.alert(title, body, [{ text: "Got it", style: "default" }], {
-        cancelable: false,
-      });
-    });
+        Alert.alert(title, body, [{ text: "Got it", style: "default" }], {
+          cancelable: false,
+        });
+      },
+    );
 
     // Tap-on-notification handler (app was in background)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    });
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      });
 
     return () => {
       notifListener.current?.remove();
@@ -96,13 +108,15 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary FallbackComponent={ErrorFallback}>
         <QueryClientProvider client={queryClient}>
-          <TaskProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
-          </TaskProvider>
+          <AuthProvider>
+            <TaskProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </TaskProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

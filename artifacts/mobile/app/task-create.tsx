@@ -4,7 +4,6 @@ import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
-  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,7 +11,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -61,16 +59,8 @@ const RECURRENCE_OPTIONS: { label: string; value: RecurrenceType }[] = [
   { label: "Weekly", value: "weekly" },
 ];
 
-// Scrollable drum-roll time picker rows
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
-
-function formatH(h: number): string {
-  if (h === 0) return "12:00 AM";
-  if (h < 12) return `${h}:00 AM`;
-  if (h === 12) return "12:00 PM";
-  return `${h - 12}:00 PM`;
-}
+const MINUTE_SLOTS = [0, 15, 30, 45];
 
 function TimePickerDrum({
   selectedHour,
@@ -88,107 +78,139 @@ function TimePickerDrum({
   accentColor: string;
 }) {
   const colors = isDark ? AppColors.dark : AppColors.light;
+  const ITEM_HEIGHT = 44;
+  const hourScrollRef = useRef<ScrollView>(null);
+  const minuteScrollRef = useRef<ScrollView>(null);
 
-  const formatTimeLabel = (h: number, m: number) => {
+  const formatHour = (h: number) => {
+    const hLabel = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const amPm = h < 12 ? "AM" : "PM";
+    return `${hLabel}:00 ${amPm}`;
+  };
+
+  const formatMinute = (h: number, m: number) => {
     const hLabel = h === 0 ? 12 : h > 12 ? h - 12 : h;
     const amPm = h < 12 ? "AM" : "PM";
     return `${hLabel}:${String(m).padStart(2, "0")} ${amPm}`;
   };
 
-  // Generate time slots ±2 around current selection
-  const visibleHours = [-2, -1, 0, 1, 2].map((offset) => {
-    const h = (selectedHour + offset + 24) % 24;
-    return h;
-  });
-
-  const minuteSlots = [0, 15, 30, 45];
-  const visibleMinutes = [-2, -1, 0, 1, 2].map((offset) => {
-    const idx = minuteSlots.indexOf(selectedMinute);
-    const newIdx = (idx + offset + minuteSlots.length) % minuteSlots.length;
-    return minuteSlots[newIdx];
-  });
-
   return (
     <View style={[styles.drumWrap, { backgroundColor: colors.cardBackground }]}>
-      <Text style={[styles.drumLabel, { color: colors.tertiaryLabel }]}>Time</Text>
-
+      <Text style={[styles.drumLabel, { color: colors.tertiaryLabel }]}>
+        Time
+      </Text>
       <View style={styles.drum}>
-        {/* Hour column */}
-        <View style={styles.drumCol}>
-          {visibleHours.map((h, idx) => {
-            const isCenter = idx === 2;
-            const distFromCenter = Math.abs(idx - 2);
-            const opacity = distFromCenter === 0 ? 1 : distFromCenter === 1 ? 0.45 : 0.18;
-            const fontSize = isCenter ? 15 : 13;
-            return (
-              <TouchableOpacity
-                key={`h${h}${idx}`}
-                onPress={() => {
-                  onHourChange(h);
-                  Haptics.selectionAsync();
-                }}
-                style={[styles.drumItem, isCenter && { backgroundColor: accentColor, borderRadius: 24 }]}
+        {/* Hour Column */}
+        <ScrollView
+          ref={hourScrollRef}
+          style={{ flex: 1, height: ITEM_HEIGHT * 5 }}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={ITEM_HEIGHT}
+          decelerationRate="fast"
+          contentOffset={{ x: 0, y: selectedHour * ITEM_HEIGHT }}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+            onHourChange(Math.max(0, Math.min(23, idx)));
+            Haptics.selectionAsync();
+          }}
+        >
+          {HOURS.map((h) => (
+            <TouchableOpacity
+              key={h}
+              style={[
+                styles.drumItem,
+                { height: ITEM_HEIGHT },
+                selectedHour === h && {
+                  backgroundColor: accentColor,
+                  borderRadius: 24,
+                },
+              ]}
+              onPress={() => {
+                onHourChange(h);
+                hourScrollRef.current?.scrollTo({
+                  y: h * ITEM_HEIGHT,
+                  animated: true,
+                });
+                Haptics.selectionAsync();
+              }}
+            >
+              <Text
+                style={[
+                  styles.drumItemText,
+                  {
+                    color: selectedHour === h ? "#FFF" : colors.label,
+                    fontFamily:
+                      selectedHour === h
+                        ? "Inter_600SemiBold"
+                        : "Inter_400Regular",
+                  },
+                ]}
               >
-                <Text
-                  style={[
-                    styles.drumItemText,
-                    {
-                      color: isCenter ? "#FFF" : colors.label,
-                      opacity,
-                      fontSize,
-                      fontFamily: isCenter ? "Inter_600SemiBold" : "Inter_400Regular",
-                    },
-                  ]}
-                >
-                  {formatH(h)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                {formatHour(h)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-        {/* Minute column */}
-        <View style={styles.drumCol}>
-          {visibleMinutes.map((m, idx) => {
-            const isCenter = idx === 2;
-            const distFromCenter = Math.abs(idx - 2);
-            const opacity = distFromCenter === 0 ? 1 : distFromCenter === 1 ? 0.45 : 0.18;
-            const selectedH = selectedHour;
-            const hLabel = selectedH === 0 ? 12 : selectedH > 12 ? selectedH - 12 : selectedH;
-            const amPm = selectedH < 12 ? "AM" : "PM";
-            const timeStr = `${hLabel}:${String(m).padStart(2, "0")} ${amPm}`;
-            return (
-              <TouchableOpacity
-                key={`m${m}${idx}`}
-                onPress={() => {
-                  onMinuteChange(m);
-                  Haptics.selectionAsync();
-                }}
-                style={[styles.drumItem, isCenter && { backgroundColor: accentColor, borderRadius: 24 }]}
+        {/* Minute Column */}
+        <ScrollView
+          ref={minuteScrollRef}
+          style={{ flex: 1, height: ITEM_HEIGHT * 5 }}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={ITEM_HEIGHT}
+          decelerationRate="fast"
+          contentOffset={{
+            x: 0,
+            y: MINUTE_SLOTS.indexOf(selectedMinute) * ITEM_HEIGHT,
+          }}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+            onMinuteChange(MINUTE_SLOTS[Math.max(0, Math.min(3, idx))]);
+            Haptics.selectionAsync();
+          }}
+        >
+          {MINUTE_SLOTS.map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[
+                styles.drumItem,
+                { height: ITEM_HEIGHT },
+                selectedMinute === m && {
+                  backgroundColor: accentColor,
+                  borderRadius: 24,
+                },
+              ]}
+              onPress={() => {
+                onMinuteChange(m);
+                minuteScrollRef.current?.scrollTo({
+                  y: MINUTE_SLOTS.indexOf(m) * ITEM_HEIGHT,
+                  animated: true,
+                });
+                Haptics.selectionAsync();
+              }}
+            >
+              <Text
+                style={[
+                  styles.drumItemText,
+                  {
+                    color: selectedMinute === m ? "#FFF" : colors.label,
+                    fontFamily:
+                      selectedMinute === m
+                        ? "Inter_600SemiBold"
+                        : "Inter_400Regular",
+                  },
+                ]}
               >
-                <Text
-                  style={[
-                    styles.drumItemText,
-                    {
-                      color: isCenter ? "#FFF" : colors.label,
-                      opacity,
-                      fontSize: isCenter ? 15 : 13,
-                      fontFamily: isCenter ? "Inter_600SemiBold" : "Inter_400Regular",
-                    },
-                  ]}
-                >
-                  {`${hLabel}:${String(m).padStart(2, "0")} ${amPm}`}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                {formatMinute(selectedHour, m)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
     </View>
   );
 }
 
-// --- Step indicator ---
 function StepDot({ active, isDark }: { active: boolean; isDark: boolean }) {
   const colors = isDark ? AppColors.dark : AppColors.light;
   return (
@@ -203,17 +225,19 @@ function StepDot({ active, isDark }: { active: boolean; isDark: boolean }) {
 }
 
 export default function TaskCreateScreen() {
-  const { date, inbox } = useLocalSearchParams<{ date?: string; inbox?: string }>();
+  const { date, inbox } = useLocalSearchParams<{
+    date?: string;
+    inbox?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const isDark = useIsDark();
   const colors = isDark ? AppColors.dark : AppColors.light;
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
   const isInbox = inbox === "true";
 
   const { addTask, addToInbox, hapticsEnabled, tasks } = useTaskContext();
 
-  const [step, setStep] = useState(0); // 0: title, 1: time, 2: details
+  const [step, setStep] = useState(0);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedColor, setSelectedColor] = useState(AppColors.primary);
@@ -226,7 +250,6 @@ export default function TaskCreateScreen() {
 
   const targetDate = date || todayStr();
 
-  // Suggestions: today's tasks from context for quick-pick reference
   const suggestions = tasks
     .filter((t) => t.startTime && !t.isCompleted)
     .sort((a, b) => (a.startTime! > b.startTime! ? 1 : -1))
@@ -234,7 +257,8 @@ export default function TaskCreateScreen() {
 
   const handleContinue = () => {
     if (step === 0 && !title.trim()) {
-      if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (hapticsEnabled)
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -247,11 +271,14 @@ export default function TaskCreateScreen() {
 
   const handleSave = async () => {
     if (!title.trim()) return;
-    if (hapticsEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (hapticsEnabled)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const startTime = isInbox
       ? undefined
-      : new Date(`${targetDate}T${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}:00`).toISOString();
+      : new Date(
+          `${targetDate}T${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}:00`,
+        ).toISOString();
 
     const taskData = {
       title: title.trim(),
@@ -264,7 +291,7 @@ export default function TaskCreateScreen() {
       subtasks: [],
       recurrence,
       recurrenceDays: [],
-      notificationMinutesBefore: -1,
+      notificationMinutesBefore: 5,
       date: targetDate,
     };
 
@@ -279,23 +306,26 @@ export default function TaskCreateScreen() {
   const heroColor = selectedColor;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}>
-      {/* Handle */}
+    <View
+      style={[styles.container, { backgroundColor: colors.scaffoldBackground }]}
+    >
       <View style={styles.handle}>
         <View style={[styles.handleBar, { backgroundColor: heroColor }]} />
       </View>
 
-      {/* Hero colored header */}
       <View style={[styles.hero, { backgroundColor: heroColor }]}>
         <View style={styles.heroTopRow}>
           <TouchableOpacity
-            onPress={() => (step > 0 ? setStep(s => s - 1) : router.back())}
+            onPress={() => (step > 0 ? setStep((s) => s - 1) : router.back())}
             style={styles.heroCloseBtn}
           >
             <Feather name="x" size={20} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
-          {/* Color picker row */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.colorRow}
+          >
             {AppColors.taskColors.map((c) => (
               <TouchableOpacity
                 key={c}
@@ -319,7 +349,7 @@ export default function TaskCreateScreen() {
 
         <View style={styles.heroContent}>
           <TouchableOpacity
-            style={[styles.heroIconCircle]}
+            style={styles.heroIconCircle}
             onPress={() => setShowIconPicker((v) => !v)}
             activeOpacity={0.8}
           >
@@ -336,7 +366,7 @@ export default function TaskCreateScreen() {
             returnKeyType="done"
             onSubmitEditing={() => step === 0 && setStep(1)}
           />
-          <View style={[styles.heroRingCircle]}>
+          <View style={styles.heroRingCircle}>
             <Feather name="circle" size={22} color="rgba(255,255,255,0.5)" />
           </View>
         </View>
@@ -344,14 +374,20 @@ export default function TaskCreateScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad + 24 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: bottomPad + 24 },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Icon picker */}
         {showIconPicker && (
-          <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.cardSectionTitle, { color: colors.label }]}>Choose Icon</Text>
+          <View
+            style={[styles.card, { backgroundColor: colors.cardBackground }]}
+          >
+            <Text style={[styles.cardSectionTitle, { color: colors.label }]}>
+              Choose Icon
+            </Text>
             <View style={styles.iconGrid}>
               {ICON_OPTIONS.map((opt) => (
                 <TouchableOpacity
@@ -365,7 +401,9 @@ export default function TaskCreateScreen() {
                     styles.iconGridItem,
                     {
                       backgroundColor:
-                        selectedIcon === opt.name ? selectedColor + "30" : colors.separator + "60",
+                        selectedIcon === opt.name
+                          ? selectedColor + "30"
+                          : colors.separator + "60",
                       borderWidth: selectedIcon === opt.name ? 2 : 0,
                       borderColor: selectedColor,
                     },
@@ -375,12 +413,19 @@ export default function TaskCreateScreen() {
                   <Feather
                     name={opt.name as any}
                     size={22}
-                    color={selectedIcon === opt.name ? selectedColor : colors.label}
+                    color={
+                      selectedIcon === opt.name ? selectedColor : colors.label
+                    }
                   />
                   <Text
                     style={[
                       styles.iconGridLabel,
-                      { color: selectedIcon === opt.name ? selectedColor : colors.tertiaryLabel },
+                      {
+                        color:
+                          selectedIcon === opt.name
+                            ? selectedColor
+                            : colors.tertiaryLabel,
+                      },
                     ]}
                   >
                     {opt.label}
@@ -391,19 +436,30 @@ export default function TaskCreateScreen() {
           </View>
         )}
 
-        {/* Step 0: Title + suggestions */}
         {step === 0 && !isInbox && (
           <>
             {suggestions.length > 0 && (
               <View style={styles.suggestionsBlock}>
-                <Text style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}>Suggestions</Text>
-                <View style={[styles.suggestionsCard, { backgroundColor: colors.cardBackground }]}>
+                <Text
+                  style={[styles.sectionLabel, { color: colors.tertiaryLabel }]}
+                >
+                  Suggestions
+                </Text>
+                <View
+                  style={[
+                    styles.suggestionsCard,
+                    { backgroundColor: colors.cardBackground },
+                  ]}
+                >
                   {suggestions.map((t, idx) => (
                     <TouchableOpacity
                       key={t.id}
                       style={[
                         styles.suggestionRow,
-                        idx < suggestions.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.separator },
+                        idx < suggestions.length - 1 && {
+                          borderBottomWidth: StyleSheet.hairlineWidth,
+                          borderBottomColor: colors.separator,
+                        },
                       ]}
                       onPress={() => {
                         setTitle(t.title);
@@ -413,31 +469,51 @@ export default function TaskCreateScreen() {
                       }}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.suggDot, { backgroundColor: t.colorValue }]} />
+                      <View
+                        style={[
+                          styles.suggDot,
+                          { backgroundColor: t.colorValue },
+                        ]}
+                      />
                       <View style={styles.suggText}>
-                        <Text style={[styles.suggTime, { color: colors.tertiaryLabel }]}>
+                        <Text
+                          style={[
+                            styles.suggTime,
+                            { color: colors.tertiaryLabel },
+                          ]}
+                        >
                           {t.startTime
-                            ? new Date(t.startTime).toLocaleTimeString("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                hour12: true,
-                              })
+                            ? new Date(t.startTime).toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                },
+                              )
                             : ""}{" "}
                           ({t.durationMinutes}m)
                         </Text>
-                        <Text style={[styles.suggTitle, { color: colors.label }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.suggTitle, { color: colors.label }]}
+                          numberOfLines={1}
+                        >
                           {t.title}
                         </Text>
                       </View>
-                      <Feather name="chevron-right" size={16} color={colors.tertiaryLabel} />
+                      <Feather
+                        name="chevron-right"
+                        size={16}
+                        color={colors.tertiaryLabel}
+                      />
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
             )}
-
-            {/* Notes */}
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
               <TextInput
                 style={[styles.notesInput, { color: colors.label }]}
                 placeholder="Notes (optional)"
@@ -450,29 +526,42 @@ export default function TaskCreateScreen() {
           </>
         )}
 
-        {/* Step 1: Time + Duration */}
-        {(step === 1 || isInbox) && !isInbox && (
+        {step === 1 && !isInbox && (
           <>
-            {/* Date row */}
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
               <View style={styles.dateRow}>
-                <Feather name="calendar" size={18} color={colors.tertiaryLabel} />
+                <Feather
+                  name="calendar"
+                  size={18}
+                  color={colors.tertiaryLabel}
+                />
                 <Text style={[styles.dateText, { color: colors.label }]}>
-                  {new Date(targetDate + "T12:00:00").toLocaleDateString("en-US", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {new Date(targetDate + "T12:00:00").toLocaleDateString(
+                    "en-US",
+                    {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    },
+                  )}
                 </Text>
-                <TouchableOpacity style={[styles.todayBadge, { backgroundColor: heroColor + "22" }]}>
-                  <Text style={[styles.todayText, { color: heroColor }]}>Today</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.todayBadge,
+                    { backgroundColor: heroColor + "22" },
+                  ]}
+                >
+                  <Text style={[styles.todayText, { color: heroColor }]}>
+                    Today
+                  </Text>
                   <Feather name="chevron-right" size={13} color={heroColor} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Time drum picker */}
             <TimePickerDrum
               selectedHour={startHour}
               selectedMinute={startMinute}
@@ -482,9 +571,12 @@ export default function TaskCreateScreen() {
               accentColor={heroColor}
             />
 
-            {/* Duration */}
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-              <Text style={[styles.cardSectionTitle, { color: colors.label }]}>Duration</Text>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
+              <Text style={[styles.cardSectionTitle, { color: colors.label }]}>
+                Duration
+              </Text>
               <View style={styles.durationRow}>
                 {DURATION_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -505,7 +597,9 @@ export default function TaskCreateScreen() {
                     <Text
                       style={[
                         styles.durationPillText,
-                        { color: duration === opt.value ? "#FFF" : colors.label },
+                        {
+                          color: duration === opt.value ? "#FFF" : colors.label,
+                        },
                       ]}
                     >
                       {opt.label}
@@ -517,11 +611,14 @@ export default function TaskCreateScreen() {
           </>
         )}
 
-        {/* Step 2: Color, Repeat, Details */}
         {step === 2 && !isInbox && (
           <>
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-              <Text style={[styles.cardSectionTitle, { color: colors.label }]}>Repeat</Text>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
+              <Text style={[styles.cardSectionTitle, { color: colors.label }]}>
+                Repeat
+              </Text>
               <View style={styles.pillRow}>
                 {RECURRENCE_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -533,7 +630,10 @@ export default function TaskCreateScreen() {
                     style={[
                       styles.durationPill,
                       {
-                        backgroundColor: recurrence === opt.value ? heroColor : colors.separator,
+                        backgroundColor:
+                          recurrence === opt.value
+                            ? heroColor
+                            : colors.separator,
                       },
                     ]}
                     activeOpacity={0.75}
@@ -541,7 +641,10 @@ export default function TaskCreateScreen() {
                     <Text
                       style={[
                         styles.durationPillText,
-                        { color: recurrence === opt.value ? "#FFF" : colors.label },
+                        {
+                          color:
+                            recurrence === opt.value ? "#FFF" : colors.label,
+                        },
                       ]}
                     >
                       {opt.label}
@@ -550,9 +653,9 @@ export default function TaskCreateScreen() {
                 ))}
               </View>
             </View>
-
-            {/* Notes on step 2 */}
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
               <TextInput
                 style={[styles.notesInput, { color: colors.label }]}
                 placeholder="Notes (optional)"
@@ -565,10 +668,11 @@ export default function TaskCreateScreen() {
           </>
         )}
 
-        {/* Inbox specific - notes + duration */}
         {isInbox && (
           <>
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
               <TextInput
                 style={[styles.notesInput, { color: colors.label }]}
                 placeholder="Notes (optional)"
@@ -578,8 +682,12 @@ export default function TaskCreateScreen() {
                 multiline
               />
             </View>
-            <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-              <Text style={[styles.cardSectionTitle, { color: colors.label }]}>Duration</Text>
+            <View
+              style={[styles.card, { backgroundColor: colors.cardBackground }]}
+            >
+              <Text style={[styles.cardSectionTitle, { color: colors.label }]}>
+                Duration
+              </Text>
               <View style={styles.durationRow}>
                 {DURATION_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -590,14 +698,19 @@ export default function TaskCreateScreen() {
                     }}
                     style={[
                       styles.durationPill,
-                      { backgroundColor: duration === opt.value ? heroColor : colors.separator },
+                      {
+                        backgroundColor:
+                          duration === opt.value ? heroColor : colors.separator,
+                      },
                     ]}
                     activeOpacity={0.75}
                   >
                     <Text
                       style={[
                         styles.durationPillText,
-                        { color: duration === opt.value ? "#FFF" : colors.label },
+                        {
+                          color: duration === opt.value ? "#FFF" : colors.label,
+                        },
                       ]}
                     >
                       {opt.label}
@@ -610,7 +723,6 @@ export default function TaskCreateScreen() {
         )}
       </ScrollView>
 
-      {/* Step indicators + Continue button */}
       <View
         style={[
           styles.footer,
@@ -655,7 +767,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   handle: { paddingTop: 10, alignItems: "center" },
   handleBar: { width: 36, height: 4, borderRadius: 2 },
-
   hero: {
     paddingHorizontal: 16,
     paddingBottom: 20,
@@ -678,22 +789,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  colorRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingVertical: 2,
-  },
-  colorCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-  },
-
-  heroContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  colorRow: { flexDirection: "row", gap: 8, paddingVertical: 2 },
+  colorCircle: { width: 26, height: 26, borderRadius: 13 },
+  heroContent: { flexDirection: "row", alignItems: "center", gap: 12 },
   heroIconCircle: {
     width: 48,
     height: 48,
@@ -703,31 +801,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  heroIconDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.7)",
-  },
   heroTitleInput: {
     flex: 1,
     fontSize: 22,
     fontFamily: "Inter_700Bold",
     color: "#FFF",
   },
-  heroRingCircle: {
-    paddingLeft: 4,
-  },
-
+  heroRingCircle: { paddingLeft: 4 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 12 },
-
   suggestionsBlock: { gap: 8 },
-  sectionLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    marginLeft: 4,
-  },
+  sectionLabel: { fontSize: 13, fontFamily: "Inter_500Medium", marginLeft: 4 },
   suggestionsCard: {
     borderRadius: 16,
     overflow: "hidden",
@@ -744,22 +828,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
-  suggDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    flexShrink: 0,
-  },
+  suggDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   suggText: { flex: 1 },
-  suggTime: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
-  suggTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-  },
-
+  suggTime: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  suggTitle: { fontSize: 15, fontFamily: "Inter_500Medium" },
   card: {
     borderRadius: 16,
     overflow: "hidden",
@@ -808,11 +880,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  dateText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-  },
+  dateText: { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium" },
   todayBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -821,11 +889,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 2,
   },
-  todayText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
-
+  todayText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   drumWrap: {
     borderRadius: 16,
     padding: 16,
@@ -836,27 +900,15 @@ const styles = StyleSheet.create({
     elevation: 2,
     gap: 12,
   },
-  drumLabel: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
-  drum: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  drumCol: {
-    flex: 1,
-    gap: 2,
-  },
+  drumLabel: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  drum: { flexDirection: "row", gap: 8 },
+  drumCol: { flex: 1, gap: 2 },
   drumItem: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     alignItems: "center",
   },
-  drumItemText: {
-    textAlign: "center",
-  },
-
+  drumItemText: { textAlign: "center" },
   durationRow: {
     flexDirection: "row",
     gap: 8,
@@ -871,39 +923,16 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     flexWrap: "wrap",
   },
-  durationPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 22,
-  },
-  durationPillText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-
+  durationPill: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22 },
+  durationPillText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   footer: {
     paddingHorizontal: 16,
     paddingTop: 12,
     gap: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  stepDots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  continueBtn: {
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  continueBtnText: {
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-  },
+  stepDots: { flexDirection: "row", justifyContent: "center", gap: 6 },
+  stepDot: { width: 8, height: 8, borderRadius: 4 },
+  continueBtn: { borderRadius: 16, paddingVertical: 16, alignItems: "center" },
+  continueBtnText: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
 });

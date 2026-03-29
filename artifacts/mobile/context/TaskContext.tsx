@@ -1,12 +1,23 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   cancelTaskNotification,
   rescheduleAllNotifications,
   scheduleTaskNotification,
-} from '@/utils/notifications';
+} from "@/utils/notifications";
 
-export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'weekdays' | 'custom';
+export type RecurrenceType =
+  | "none"
+  | "daily"
+  | "weekly"
+  | "weekdays"
+  | "custom";
 
 export interface Subtask {
   id: string;
@@ -36,238 +47,246 @@ interface TaskContextType {
   inboxTasks: Task[];
   selectedDate: string;
   setSelectedDate: (date: string) => void;
-  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<void>;
+  addTask: (task: Omit<Task, "id" | "createdAt">) => Promise<void>;
   updateTask: (task: Task) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   toggleTaskCompletion: (id: string) => Promise<void>;
-  rescheduleTask: (id: string, newStartTime: string, newDate: string) => Promise<void>;
+  rescheduleTask: (
+    id: string,
+    newStartTime: string,
+    newDate: string,
+  ) => Promise<void>;
   getTasksForDate: (date: string) => Task[];
-  addToInbox: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<void>;
-  scheduleFromInbox: (id: string, startTime: string, date: string) => Promise<void>;
+  addToInbox: (task: Omit<Task, "id" | "createdAt">) => Promise<void>;
+  scheduleFromInbox: (
+    id: string,
+    startTime: string,
+    date: string,
+  ) => Promise<void>;
   deleteFromInbox: (id: string) => Promise<void>;
-  themeMode: 'light' | 'dark' | 'system';
-  setThemeMode: (mode: 'light' | 'dark' | 'system') => void;
+  themeMode: "light" | "dark" | "system";
+  setThemeMode: (mode: "light" | "dark" | "system") => void;
   firstDayOfWeek: number;
   setFirstDayOfWeek: (day: number) => void;
-  timeFormat: '12h' | '24h';
-  setTimeFormat: (format: '12h' | '24h') => void;
+  timeFormat: "12h" | "24h";
+  setTimeFormat: (format: "12h" | "24h") => void;
   hapticsEnabled: boolean;
   setHapticsEnabled: (enabled: boolean) => void;
 }
 
 const TaskContext = createContext<TaskContextType | null>(null);
 
-const TASKS_KEY = '@structured_tasks';
-const INBOX_KEY = '@structured_inbox';
-const SETTINGS_KEY = '@structured_settings';
+const TASKS_KEY = "@structured_tasks";
+const INBOX_KEY = "@structured_inbox";
+const SETTINGS_KEY = "@structured_settings";
 
 function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
 function todayStr(): string {
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 }
 
-const SAMPLE_TASKS: Omit<Task, 'id' | 'createdAt'>[] = [
+const SAMPLE_TASKS: Omit<Task, "id" | "createdAt">[] = [
   {
-    title: 'Morning Meditation',
+    title: "Morning Meditation",
     startTime: new Date(new Date().setHours(7, 0, 0, 0)).toISOString(),
     durationMinutes: 20,
-    colorValue: '#9B8FE8',
-    iconName: 'wind',
+    colorValue: "#9B8FE8",
+    iconName: "wind",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'daily',
+    recurrence: "daily",
     recurrenceDays: [],
     notificationMinutesBefore: 5,
     date: todayStr(),
   },
   {
-    title: 'Morning Run',
+    title: "Morning Run",
     startTime: new Date(new Date().setHours(7, 30, 0, 0)).toISOString(),
     durationMinutes: 45,
-    colorValue: '#5DA85D',
-    iconName: 'activity',
+    colorValue: "#5DA85D",
+    iconName: "activity",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Breakfast & Coffee',
+    title: "Breakfast & Coffee",
     startTime: new Date(new Date().setHours(8, 30, 0, 0)).toISOString(),
     durationMinutes: 30,
-    colorValue: '#F5A623',
-    iconName: 'coffee',
+    colorValue: "#F5A623",
+    iconName: "coffee",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Deep Work: Project Alpha',
+    title: "Deep Work: Project Alpha",
     startTime: new Date(new Date().setHours(9, 30, 0, 0)).toISOString(),
     durationMinutes: 90,
-    colorValue: '#5B8DEF',
-    iconName: 'laptop-mac',
+    colorValue: "#5B8DEF",
+    iconName: "laptop-mac",
     isCompleted: false,
     subtasks: [
-      { id: generateId(), title: 'Review requirements', isCompleted: true },
-      { id: generateId(), title: 'Write unit tests', isCompleted: false },
-      { id: generateId(), title: 'Deploy to staging', isCompleted: false },
+      { id: generateId(), title: "Review requirements", isCompleted: true },
+      { id: generateId(), title: "Write unit tests", isCompleted: false },
+      { id: generateId(), title: "Deploy to staging", isCompleted: false },
     ],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: 10,
     date: todayStr(),
   },
   {
-    title: 'Team Standup',
+    title: "Team Standup",
     startTime: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(),
     durationMinutes: 30,
-    colorValue: '#E8734A',
-    iconName: 'users',
+    colorValue: "#E8734A",
+    iconName: "users",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'weekdays',
+    recurrence: "weekdays",
     recurrenceDays: [],
     notificationMinutesBefore: 5,
     date: todayStr(),
   },
   {
-    title: 'Lunch Break',
+    title: "Lunch Break",
     startTime: new Date(new Date().setHours(13, 0, 0, 0)).toISOString(),
     durationMinutes: 60,
-    colorValue: '#F5A623',
-    iconName: 'coffee',
+    colorValue: "#F5A623",
+    iconName: "coffee",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Design Review',
+    title: "Design Review",
     startTime: new Date(new Date().setHours(14, 30, 0, 0)).toISOString(),
     durationMinutes: 60,
-    colorValue: '#E84393',
-    iconName: 'pen-tool',
+    colorValue: "#E84393",
+    iconName: "pen-tool",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: 10,
     date: todayStr(),
   },
   {
-    title: 'Gym Session',
+    title: "Gym Session",
     startTime: new Date(new Date().setHours(17, 30, 0, 0)).toISOString(),
     durationMinutes: 75,
-    colorValue: '#5DA85D',
-    iconName: 'zap',
+    colorValue: "#5DA85D",
+    iconName: "zap",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: 15,
     date: todayStr(),
   },
   {
-    title: 'Read: Atomic Habits',
+    title: "Read: Atomic Habits",
     startTime: new Date(new Date().setHours(21, 0, 0, 0)).toISOString(),
     durationMinutes: 45,
-    colorValue: '#9B8FE8',
-    iconName: 'book',
+    colorValue: "#9B8FE8",
+    iconName: "book",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'daily',
+    recurrence: "daily",
     recurrenceDays: [],
     notificationMinutesBefore: 5,
     date: todayStr(),
   },
   {
-    title: 'Evening Journaling',
+    title: "Evening Journaling",
     startTime: new Date(new Date().setHours(22, 0, 0, 0)).toISOString(),
     durationMinutes: 20,
-    colorValue: '#5B8DEF',
-    iconName: 'edit',
+    colorValue: "#5B8DEF",
+    iconName: "edit",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'daily',
+    recurrence: "daily",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
 ];
 
-const INBOX_SAMPLES: Omit<Task, 'id' | 'createdAt'>[] = [
+const INBOX_SAMPLES: Omit<Task, "id" | "createdAt">[] = [
   {
-    title: 'Call dentist',
-    notes: 'Schedule cleaning appointment',
+    title: "Call dentist",
+    notes: "Schedule cleaning appointment",
     durationMinutes: 30,
-    colorValue: '#5B8DEF',
-    iconName: 'plus-circle',
+    colorValue: "#5B8DEF",
+    iconName: "plus-circle",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Buy groceries',
-    notes: 'Milk, eggs, bread, coffee',
+    title: "Buy groceries",
+    notes: "Milk, eggs, bread, coffee",
     durationMinutes: 45,
-    colorValue: '#5DA85D',
-    iconName: 'shopping-cart',
+    colorValue: "#5DA85D",
+    iconName: "shopping-cart",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Review pull requests',
-    notes: 'Frontend team PRs for this sprint',
+    title: "Review pull requests",
+    notes: "Frontend team PRs for this sprint",
     durationMinutes: 30,
-    colorValue: '#9B8FE8',
-    iconName: 'code',
+    colorValue: "#9B8FE8",
+    iconName: "code",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Plan weekend trip',
-    notes: 'Look into options for hiking trails',
+    title: "Plan weekend trip",
+    notes: "Look into options for hiking trails",
     durationMinutes: 60,
-    colorValue: '#4EC9B0',
-    iconName: 'compass',
+    colorValue: "#4EC9B0",
+    iconName: "compass",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
   },
   {
-    title: 'Update resume',
-    notes: 'Add recent projects and skills',
+    title: "Update resume",
+    notes: "Add recent projects and skills",
     durationMinutes: 90,
-    colorValue: '#E8734A',
-    iconName: 'file-text',
+    colorValue: "#E8734A",
+    iconName: "file-text",
     isCompleted: false,
     subtasks: [],
-    recurrence: 'none',
+    recurrence: "none",
     recurrenceDays: [],
     notificationMinutesBefore: -1,
     date: todayStr(),
@@ -278,9 +297,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [inboxTasks, setInboxTasks] = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr());
-  const [themeMode, setThemeModeState] = useState<'light' | 'dark' | 'system'>('system');
+  const [themeMode, setThemeModeState] = useState<"light" | "dark" | "system">(
+    "system",
+  );
   const [firstDayOfWeek, setFirstDayOfWeekState] = useState<number>(1);
-  const [timeFormat, setTimeFormatState] = useState<'12h' | '24h'>('12h');
+  const [timeFormat, setTimeFormatState] = useState<"12h" | "24h">("12h");
   const [hapticsEnabled, setHapticsEnabledState] = useState<boolean>(true);
 
   useEffect(() => {
@@ -326,12 +347,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       if (settingsRaw) {
         const s = JSON.parse(settingsRaw);
         if (s.themeMode) setThemeModeState(s.themeMode);
-        if (s.firstDayOfWeek !== undefined) setFirstDayOfWeekState(s.firstDayOfWeek);
+        if (s.firstDayOfWeek !== undefined)
+          setFirstDayOfWeekState(s.firstDayOfWeek);
         if (s.timeFormat) setTimeFormatState(s.timeFormat);
-        if (s.hapticsEnabled !== undefined) setHapticsEnabledState(s.hapticsEnabled);
+        if (s.hapticsEnabled !== undefined)
+          setHapticsEnabledState(s.hapticsEnabled);
       }
     } catch (e) {
-      console.error('Error loading data:', e);
+      console.error("Error loading data:", e);
     }
   };
 
@@ -346,28 +369,60 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const saveSettings = useCallback(
-    async (patch: Partial<{ themeMode: string; firstDayOfWeek: number; timeFormat: string; hapticsEnabled: boolean }>) => {
+    async (
+      patch: Partial<{
+        themeMode: string;
+        firstDayOfWeek: number;
+        timeFormat: string;
+        hapticsEnabled: boolean;
+      }>,
+    ) => {
       const current = { themeMode, firstDayOfWeek, timeFormat, hapticsEnabled };
       const updated = { ...current, ...patch };
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
     },
-    [themeMode, firstDayOfWeek, timeFormat, hapticsEnabled]
+    [themeMode, firstDayOfWeek, timeFormat, hapticsEnabled],
   );
 
   const addTask = useCallback(
-    async (task: Omit<Task, 'id' | 'createdAt'>) => {
+    async (task: Omit<Task, "id" | "createdAt">) => {
       const newTask: Task = {
         ...task,
         id: generateId(),
         createdAt: new Date().toISOString(),
       };
       await saveTasks([...tasks, newTask]);
+      // Supabase mein save karo
+      const SUPABASE_URL = "https://oqupehpgehwzyrifzwdt.supabase.co";
+      const SUPABASE_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xdXBlaHBnZWh3enlyaWZ6d2R0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzQ4ODYsImV4cCI6MjA5MDI1MDg4Nn0.WU8MGwpk1mpIp9xH6DScMFnCEDjw5GNBfIeHUV14FL4";
+      fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          task_name: newTask.title,
+          task_time: newTask.startTime || "",
+          duration: String(newTask.durationMinutes),
+          status: "pending",
+          task_date: newTask.date || new Date().toISOString(),
+          user_email: "user@gmail.com",
+        }),
+      }).catch((e) => console.log("Supabase error:", e));
       // Schedule alarm at start time
       if (newTask.startTime && !newTask.isCompleted) {
-        scheduleTaskNotification(newTask.id, newTask.title, newTask.startTime, newTask.durationMinutes).catch(() => {});
+        scheduleTaskNotification(
+          newTask.id,
+          newTask.title,
+          newTask.startTime,
+          newTask.durationMinutes,
+        ).catch(() => {});
       }
     },
-    [tasks, saveTasks]
+    [tasks, saveTasks],
   );
 
   const updateTask = useCallback(
@@ -375,12 +430,17 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       await saveTasks(tasks.map((t) => (t.id === task.id ? task : t)));
       // Re-schedule (cancel old, set new) whenever a task is updated
       if (task.startTime && !task.isCompleted) {
-        scheduleTaskNotification(task.id, task.title, task.startTime, task.durationMinutes).catch(() => {});
+        scheduleTaskNotification(
+          task.id,
+          task.title,
+          task.startTime,
+          task.durationMinutes,
+        ).catch(() => {});
       } else {
         cancelTaskNotification(task.id).catch(() => {});
       }
     },
-    [tasks, saveTasks]
+    [tasks, saveTasks],
   );
 
   const deleteTask = useCallback(
@@ -388,12 +448,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       await saveTasks(tasks.filter((t) => t.id !== id));
       cancelTaskNotification(id).catch(() => {});
     },
-    [tasks, saveTasks]
+    [tasks, saveTasks],
   );
 
   const toggleTaskCompletion = useCallback(
     async (id: string) => {
-      const updated = tasks.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted } : t));
+      const updated = tasks.map((t) =>
+        t.id === id ? { ...t, isCompleted: !t.isCompleted } : t,
+      );
       await saveTasks(updated);
       const task = updated.find((t) => t.id === id);
       if (task) {
@@ -402,25 +464,35 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           cancelTaskNotification(id).catch(() => {});
         } else if (task.startTime) {
           // Uncompleted — reinstate the alarm
-          scheduleTaskNotification(id, task.title, task.startTime, task.durationMinutes).catch(() => {});
+          scheduleTaskNotification(
+            id,
+            task.title,
+            task.startTime,
+            task.durationMinutes,
+          ).catch(() => {});
         }
       }
     },
-    [tasks, saveTasks]
+    [tasks, saveTasks],
   );
 
   const rescheduleTask = useCallback(
     async (id: string, newStartTime: string, newDate: string) => {
       const updated = tasks.map((t) =>
-        t.id === id ? { ...t, startTime: newStartTime, date: newDate } : t
+        t.id === id ? { ...t, startTime: newStartTime, date: newDate } : t,
       );
       await saveTasks(updated);
       const task = updated.find((t) => t.id === id);
       if (task && !task.isCompleted) {
-        scheduleTaskNotification(id, task.title, newStartTime, task.durationMinutes).catch(() => {});
+        scheduleTaskNotification(
+          id,
+          task.title,
+          newStartTime,
+          task.durationMinutes,
+        ).catch(() => {});
       }
     },
-    [tasks, saveTasks]
+    [tasks, saveTasks],
   );
 
   const getTasksForDate = useCallback(
@@ -431,15 +503,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const taskDate = new Date(t.date);
         const targetDate = new Date(date);
         if (targetDate < taskDate) return false;
-        if (t.recurrence === 'daily') return true;
-        if (t.recurrence === 'weekdays') {
+        if (t.recurrence === "daily") return true;
+        if (t.recurrence === "weekdays") {
           const day = targetDate.getDay();
           return day >= 1 && day <= 5;
         }
-        if (t.recurrence === 'weekly') {
+        if (t.recurrence === "weekly") {
           return taskDate.getDay() === targetDate.getDay();
         }
-        if (t.recurrence === 'custom' && t.recurrenceDays.length > 0) {
+        if (t.recurrence === "custom" && t.recurrenceDays.length > 0) {
           const jsDay = targetDate.getDay();
           const mappedDay = jsDay === 0 ? 7 : jsDay;
           return t.recurrenceDays.includes(mappedDay);
@@ -447,11 +519,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         return false;
       });
     },
-    [tasks]
+    [tasks],
   );
 
   const addToInbox = useCallback(
-    async (task: Omit<Task, 'id' | 'createdAt'>) => {
+    async (task: Omit<Task, "id" | "createdAt">) => {
       const newTask: Task = {
         ...task,
         id: generateId(),
@@ -460,7 +532,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       };
       await saveInbox([...inboxTasks, newTask]);
     },
-    [inboxTasks, saveInbox]
+    [inboxTasks, saveInbox],
   );
 
   const scheduleFromInbox = useCallback(
@@ -473,24 +545,29 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         saveInbox(inboxTasks.filter((t) => t.id !== id)),
       ]);
       // Schedule alarm for the newly scheduled task
-      scheduleTaskNotification(id, task.title, startTime, task.durationMinutes).catch(() => {});
+      scheduleTaskNotification(
+        id,
+        task.title,
+        startTime,
+        task.durationMinutes,
+      ).catch(() => {});
     },
-    [inboxTasks, tasks, saveTasks, saveInbox]
+    [inboxTasks, tasks, saveTasks, saveInbox],
   );
 
   const deleteFromInbox = useCallback(
     async (id: string) => {
       await saveInbox(inboxTasks.filter((t) => t.id !== id));
     },
-    [inboxTasks, saveInbox]
+    [inboxTasks, saveInbox],
   );
 
   const setThemeMode = useCallback(
-    async (mode: 'light' | 'dark' | 'system') => {
+    async (mode: "light" | "dark" | "system") => {
       setThemeModeState(mode);
       await saveSettings({ themeMode: mode });
     },
-    [saveSettings]
+    [saveSettings],
   );
 
   const setFirstDayOfWeek = useCallback(
@@ -498,15 +575,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setFirstDayOfWeekState(day);
       await saveSettings({ firstDayOfWeek: day });
     },
-    [saveSettings]
+    [saveSettings],
   );
 
   const setTimeFormat = useCallback(
-    async (format: '12h' | '24h') => {
+    async (format: "12h" | "24h") => {
       setTimeFormatState(format);
       await saveSettings({ timeFormat: format });
     },
-    [saveSettings]
+    [saveSettings],
   );
 
   const setHapticsEnabled = useCallback(
@@ -514,7 +591,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setHapticsEnabledState(enabled);
       await saveSettings({ hapticsEnabled: enabled });
     },
-    [saveSettings]
+    [saveSettings],
   );
 
   return (
@@ -550,6 +627,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
 export function useTaskContext() {
   const ctx = useContext(TaskContext);
-  if (!ctx) throw new Error('useTaskContext must be used inside TaskProvider');
+  if (!ctx) throw new Error("useTaskContext must be used inside TaskProvider");
   return ctx;
 }
